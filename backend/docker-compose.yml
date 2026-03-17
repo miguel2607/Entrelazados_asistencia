@@ -1,0 +1,15 @@
+services:
+  postgres:
+    image: postgres:16
+    container_name: entrelazados-postgres
+    environment:
+      POSTGRES_DB: entrelazados_asistencia
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5432:5432"
+    volumes:
+      - entrelazados_pgdata:/var/lib/postgresql/data
+
+volumes:
+  entrelazados_pgdata:

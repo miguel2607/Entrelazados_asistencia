@@ -1,0 +1,3 @@
+ALTER TABLE nino_plan ADD COLUMN total_sesiones INT NOT NULL DEFAULT 1;
+ALTER TABLE nino_plan ADD COLUMN sesiones_consumidas INT NOT NULL DEFAULT 0;
+ALTER TABLE nino_plan ALTER COLUMN fecha_fin DROP NOT NULL;
