@@ -11,5 +11,19 @@ services:
     volumes:
       - entrelazados_pgdata:/var/lib/postgresql/data
 
+  backend-app:
+    build: .
+    container_name: entrelazados-backend
+    ports:
+      - "8081:8081"
+    environment:
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres:5432/entrelazados_asistencia
+      - SPRING_DATASOURCE_USERNAME=postgres
+      - SPRING_DATASOURCE_PASSWORD=postgres
+      - APP_JWT_SECRET=entrelazados2026SecretKeyForJWTSigningMustBe64CharsLongForHS256Algorithm!
+      - APP_CORS_ALLOWEDORIGINS=http://localhost:5173,http://localhost:5174
+    depends_on:
+      - postgres
+
 volumes:
   entrelazados_pgdata:
