@@ -150,7 +150,7 @@ export function ServiciosPage() {
               { key: 'nombre', header: 'Descripción del Servicio' },
               {
                 key: 'precio',
-                header: 'Tarifa Base',
+                header: 'Precio Total',
                 render: (s) => (
                   <span className="font-medium text-[#202124]">
                     ${s.precio.toLocaleString('es-CO')}

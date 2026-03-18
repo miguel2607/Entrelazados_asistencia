@@ -67,8 +67,9 @@ export function PlanesPage() {
   const selectedPaquete = paquetes.find((p) => p.id === form.idPaquete) || null;
 
   const totalSesiones = form.totalSesiones;
-  const precioPorDia = form.tipo === 'SERVICIO' ? (selectedServicio?.precio || 0) : (selectedPaquete?.precio || 0);
-  const totalEstimado = totalSesiones * precioPorDia;
+  const precioTotal = form.tipo === 'SERVICIO' ? (selectedServicio?.precio || 0) : (selectedPaquete?.precio || 0);
+  const tarifaPorJornadaCalculada = totalSesiones > 0 ? precioTotal / totalSesiones : precioTotal;
+  const totalEstimado = precioTotal;
 
   // Calcular fecha de fin
   const fechaFinCalculada = (() => {
@@ -232,7 +233,7 @@ export function PlanesPage() {
               <div className="flex justify-between items-center">
                 <span className="text-sm text-[#5f6368]">Tarifa por jornada</span>
                 <span className="text-sm font-medium text-[#202124]">
-                  {precioPorDia.toLocaleString('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 })}
+                  {tarifaPorJornadaCalculada.toLocaleString('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 })}
                 </span>
               </div>
               <div className="flex justify-between items-center">

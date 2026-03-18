@@ -133,11 +133,13 @@ export function NinoDetallePage() {
                 if (plan.tipo.toLowerCase() === 'servicio' && plan.idServicio) {
                   const s = servicios.find((x) => x.id === plan.idServicio);
                   if (!nombre) nombre = s?.nombre ?? 'Servicio';
-                  precioPorDia = s?.precio ?? 0;
+                  const totalPrecio = s?.precio ?? 0;
+                  precioPorDia = diasTotales > 0 ? totalPrecio / diasTotales : totalPrecio;
                 } else if (plan.tipo.toLowerCase() === 'paquete' && plan.idPaquete) {
                   const pa = paquetes.find((x) => x.id === plan.idPaquete);
                   if (!nombre) nombre = pa?.nombre ?? 'Paquete';
-                  precioPorDia = pa?.precio ?? 0;
+                  const totalPrecio = pa?.precio ?? 0;
+                  precioPorDia = diasTotales > 0 ? totalPrecio / diasTotales : totalPrecio;
                 }
                 return {
                   id: plan.id,
