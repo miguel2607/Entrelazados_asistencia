@@ -43,7 +43,7 @@ public class NinoPlanService {
         e.setIdPaquete(null);
         e.setFechaInicio(fechaInicio);
         e.setTotalSesiones(dias);
-        e.setFechaFin(fechaInicio.plusDays(dias - 1));
+        e.setFechaFin(fechaInicio.plusDays(29)); // Plazo fijo de 30 días
         e.setSesionesConsumidas(0);
         return toDomain(repo.save(e));
     }

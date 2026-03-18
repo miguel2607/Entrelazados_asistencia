@@ -124,8 +124,7 @@ export function NinoDetallePage() {
             return api
               .get<AsistenciaRow[]>(historyUrl)
               .then((historial) => {
-                const esIndefinido = !plan.fechaFin;
-                const diasTotales = esIndefinido ? plan.totalSesiones : diffDias(plan.fechaInicio, plan.fechaFin);
+                const diasTotales = plan.totalSesiones;
                 const diasUsados = plan.sesionesConsumidas ?? historial.length;
                 const diasRestantes = Math.max(0, diasTotales - diasUsados);
                 let nombre = plan.nombrePlan || '';
@@ -359,7 +358,7 @@ export function NinoDetallePage() {
                       </div>
                       <div className="text-right">
                         <p className="text-2xl font-extrabold text-[#111827] tracking-tighter">{e.diasRestantes}</p>
-                        <p className="text-[9px] text-[#4b5563] uppercase font-extrabold tracking-tighter">Días Libres</p>
+                        <p className="text-[9px] text-[#4b5563] uppercase font-extrabold tracking-tighter">Sesiones Libres</p>
                       </div>
                     </div>
                     <div className="space-y-3 mt-4 pt-5 border-t border-[#f1f3f4]">

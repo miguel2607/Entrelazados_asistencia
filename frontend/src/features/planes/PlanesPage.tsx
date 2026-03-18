@@ -76,7 +76,7 @@ export function PlanesPage() {
     if (!form.fechaInicio || !totalSesiones || totalSesiones < 1) return null;
     const inicio = new Date(form.fechaInicio + 'T00:00:00');
     const fin = new Date(inicio);
-    fin.setDate(fin.getDate() + totalSesiones - 1);
+    fin.setDate(fin.getDate() + 29); // Siempre 30 días calendario
     return fin;
   })();
 
