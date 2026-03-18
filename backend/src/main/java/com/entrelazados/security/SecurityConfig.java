@@ -80,7 +80,7 @@ public class SecurityConfig {
         // Soporte para múltiples orígenes separados por coma (para producción)
         List<String> origins = List.of(allowedOrigins.split(","));
         config.setAllowedOrigins(origins.stream().map(String::trim).toList());
-        config.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
+        config.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS", "HEAD"));
         config.setAllowedHeaders(List.of("*"));
         config.setAllowCredentials(false);
         config.setMaxAge(3600L);
