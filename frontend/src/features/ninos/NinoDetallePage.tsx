@@ -55,6 +55,9 @@ interface PlanEstado {
   precioPorDia: number;
   montoConsumido: number;
   montoRestante: number;
+  finalizado: boolean;
+  fechaTermino?: string;
+  motivoTermino?: 'sesiones' | 'tiempo';
 }
 
 export function NinoDetallePage() {
@@ -66,7 +69,9 @@ export function NinoDetallePage() {
   const [savingParent, setSavingParent] = useState(false);
   const [parentForm, setParentForm] = useState({ nombre: '', telefono: '', cc: '', parentesco: 'madre' });
   const [estadoPlanes, setEstadoPlanes] = useState<PlanEstado[]>([]);
-  const [loadingEstado, setLoadingEstado] = useState(false);
+  const [loadingEstado, setLoadingEstado] = useState(true);
+  const [toDelete, setToDelete] = useState<number | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   // Modal para añadir sesiones
   const [addSessionsModalOpen, setAddSessionsModalOpen] = useState(false);
@@ -110,16 +115,13 @@ export function NinoDetallePage() {
       api.get<PaqueteRow[]>('/paquetes'),
     ])
       .then(([planes, servicios, paquetes]) => {
-        const vigentes = planes.filter(
-          (p) => p.fechaInicio <= today && (!p.fechaFin || p.fechaFin >= today)
-        );
-        if (vigentes.length === 0) {
+        if (planes.length === 0) {
           setEstadoPlanes([]);
           setLoadingEstado(false);
           return;
         }
         return Promise.all(
-          vigentes.map((plan) => {
+          planes.map((plan) => {
             const historyUrl = `/asistencia/historial?idNino=${ninoId}&desde=${plan.fechaInicio}${plan.fechaFin ? `&hasta=${plan.fechaFin}` : ''}`;
             return api
               .get<AsistenciaRow[]>(historyUrl)
@@ -140,6 +142,21 @@ export function NinoDetallePage() {
                   const totalPrecio = pa?.precio ?? 0;
                   precioPorDia = diasTotales > 0 ? totalPrecio / diasTotales : totalPrecio;
                 }
+                const finalizadoPorSesiones = diasRestantes === 0;
+                const finalizadoPorTiempo = plan.fechaFin ? plan.fechaFin < today : false;
+                const finalizado = finalizadoPorSesiones || finalizadoPorTiempo;
+                
+                let fechaTermino = undefined;
+                let motivoTermino: 'sesiones' | 'tiempo' | undefined = undefined;
+
+                if (finalizadoPorSesiones) {
+                  motivoTermino = 'sesiones';
+                  fechaTermino = historial.length > 0 ? historial[historial.length - 1].fecha : plan.fechaInicio;
+                } else if (finalizadoPorTiempo) {
+                  motivoTermino = 'tiempo';
+                  fechaTermino = plan.fechaFin || undefined;
+                }
+
                 return {
                   id: plan.id,
                   nombre,
@@ -150,6 +167,9 @@ export function NinoDetallePage() {
                   precioPorDia,
                   montoConsumido: diasUsados * precioPorDia,
                   montoRestante: diasRestantes * precioPorDia,
+                  finalizado,
+                  fechaTermino,
+                  motivoTermino
                 } as PlanEstado;
               });
           })
@@ -164,6 +184,21 @@ export function NinoDetallePage() {
         setLoadingEstado(false);
       });
   }, [id, data, diffDias]);
+  
+
+  const eliminarPlan = async () => {
+    if (!toDelete) return;
+    setDeleting(true);
+    try {
+      await api.delete(`/planes/${toDelete}`);
+      setToDelete(null);
+      load();
+    } catch (err: any) {
+      alert('Error al eliminar: ' + err.message);
+    } finally {
+      setDeleting(false);
+    }
+  };
 
   const handleAgregarSesiones = (idPlan: number) => {
     setSelectedPlanId(idPlan);
@@ -346,15 +381,45 @@ export function NinoDetallePage() {
               </div>
             ) : (
               <div className="grid gap-6 sm:grid-cols-2">
-                {estadoPlanes.map((e, idx) => (
-                  <div key={e.id} className={`relative overflow-hidden p-6 rounded-2xl border border-[#e2e8f0] bg-white group hover:border-[#2d1b69] hover:shadow-xl hover:shadow-indigo-50 transition-all animate-scale-in stagger-${idx+1}`}>
+                {estadoPlanes.map((e) => (
+                  <div
+                    key={e.id}
+                    className={`relative overflow-hidden rounded-2xl border p-6 transition-all duration-300 hover:shadow-xl ${
+                      e.finalizado 
+                        ? 'bg-rose-50/50 border-rose-200 shadow-rose-100/50' 
+                        : 'bg-white border-[#e2e8f0]'
+                    }`}
+                  >
+                    {/* Trash Button */}
+                    <button
+                      onClick={() => setToDelete(e.id)}
+                      className="absolute top-4 right-4 p-2 rounded-full hover:bg-rose-100 text-[#9ca3af] hover:text-rose-600 transition-colors"
+                      title="Eliminar Plan"
+                    >
+                      <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                      </svg>
+                    </button>
+
                     <div className="absolute top-0 left-0 h-1.5 w-full bg-indigo-50">
-                      <div className="h-full bg-gradient-to-r from-[#2d1b69] to-[#4c1d95] transition-all duration-1000 shadow-[0_0_8px_rgba(147,51,234,0.3)]" style={{ width: `${(e.diasUsados / e.diasTotales) * 100}%` }} />
+                      <div
+                        className={`h-full rounded-full transition-all duration-1000 ${
+                          e.finalizado ? 'bg-rose-500' : 'bg-gradient-to-r from-[#2d1b69] to-[#c026d3]'
+                        }`}
+                        style={{ width: `${(e.diasUsados / e.diasTotales) * 100}%` }}
+                      />
                     </div>
-                    <div className="flex justify-between items-start mb-6 pt-2">
+                    <div className="flex items-start justify-between mb-6 pt-2">
                       <div>
-                        <p className="text-sm font-extrabold text-[#111827] group-hover:text-[#2d1b69] transition-colors">{e.nombre}</p>
-                        <p className="text-[9px] text-[#2d1b69] font-extrabold uppercase tracking-widest mt-1 px-1.5 py-0.5 bg-indigo-50 rounded-md inline-block">{e.tipo}</p>
+                        <p className={`text-[10px] font-extrabold uppercase tracking-widest leading-none mb-2 ${e.finalizado ? 'text-rose-600' : 'text-[#2d1b69]'}`}>
+                          {e.tipo} {e.finalizado ? '— FINALIZADO' : ''}
+                        </p>
+                        <h4 className="text-lg font-extrabold text-[#111827] leading-tight">{e.nombre}</h4>
+                        {e.finalizado && e.fechaTermino && (
+                          <p className="mt-1 text-xs font-bold text-rose-700">
+                            Terminó el {new Date(e.fechaTermino + 'T00:00:00').toLocaleDateString('es-CO', { day: 'numeric', month: 'long' })}
+                          </p>
+                        )}
                       </div>
                       <div className="text-right">
                         <p className="text-2xl font-extrabold text-[#111827] tracking-tighter">{e.diasRestantes}</p>
@@ -511,6 +576,41 @@ export function NinoDetallePage() {
               className="google-button-primary disabled:opacity-50 min-w-[160px]"
             >
               {isSavingSessions ? 'Guardando...' : 'Confirmar Adición'}
+            </button>
+          </div>
+        </div>
+      </Modal>
+      {/* Delete Confirmation Modal */}
+      <Modal
+        open={toDelete !== null}
+        onClose={() => setToDelete(null)}
+        title="Confirmar Eliminación"
+      >
+        <div className="space-y-6">
+          <div className="flex items-center gap-4 p-4 rounded-xl bg-rose-50 border border-rose-100">
+            <div className="h-10 w-10 rounded-full bg-rose-100 flex items-center justify-center text-rose-600">
+              <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+              </svg>
+            </div>
+            <p className="text-sm font-bold text-rose-900 leading-tight">
+              ¿Estás seguro de que deseas eliminar este plan? Esta acción no se puede deshacer.
+            </p>
+          </div>
+          <div className="flex justify-end gap-3">
+            <button
+              type="button"
+              onClick={() => setToDelete(null)}
+              className="google-button-secondary"
+            >
+              Cancelar
+            </button>
+            <button
+              onClick={eliminarPlan}
+              disabled={deleting}
+              className="px-6 py-2.5 rounded-xl bg-rose-600 text-white text-sm font-extrabold hover:bg-rose-700 transition-all shadow-lg shadow-rose-200 disabled:opacity-50"
+            >
+              {deleting ? 'Eliminando...' : 'Sí, Eliminar'}
             </button>
           </div>
         </div>
