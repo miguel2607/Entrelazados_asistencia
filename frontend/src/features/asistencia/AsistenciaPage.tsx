@@ -18,7 +18,7 @@ type AsistenciaItem = {
 };
 type PlanNino = { id: number; nombrePlan?: string; tipo: string; fechaInicio: string; fechaFin?: string | null; totalSesiones: number; sesionesConsumidas: number };
 type ServicioPaquete = { id: number; nombre: string; precio: number };
-type AsistenciaHistorialItem = { id: number; fecha: string; horaEntrada: string | null; horaSalida: string | null; observacion: string | null };
+type AsistenciaHistorialItem = { id: number; fecha: string; horaEntrada: string | null; horaSalida: string | null; jornada: string | null; observacion: string | null };
 
 export function AsistenciaPage() {
   const [fecha, setFecha] = useState(() => new Date().toISOString().slice(0, 10));
