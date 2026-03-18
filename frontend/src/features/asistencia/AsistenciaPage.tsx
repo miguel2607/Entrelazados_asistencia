@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { api } from '../../shared/api/apiClient';
 
 type Nino = { id: number; nombre: string };
@@ -33,11 +33,13 @@ export function AsistenciaPage() {
   const [loadingHistorial, setLoadingHistorial] = useState(false);
   const [observacionPorAsistenciaId, setObservacionPorAsistenciaId] = useState<Record<number, string>>({});
   const [editandoObservacionId, setEditandoObservacionId] = useState<number | null>(null);
+  
   const [nuevaAsistenciaNinoId, setNuevaAsistenciaNinoId] = useState<string>('');
   const [nuevaAsistenciaPlanId, setNuevaAsistenciaPlanId] = useState<string>('');
   const [nuevaAsistenciaServicioId, setNuevaAsistenciaServicioId] = useState<string>('');
   const [planesDelNino, setPlanesDelNino] = useState<PlanNino[]>([]);
   const [serviciosDePaquete, setServiciosDePaquete] = useState<ServicioPaquete[]>([]);
+  const [sendingEntrada, setSendingEntrada] = useState(false);
 
   const load = () => {
     setLoading(true);
@@ -53,6 +55,7 @@ export function AsistenciaPage() {
       .catch((e) => setError(e.message))
       .finally(() => setLoading(false));
   };
+
   useEffect(() => {
     setEditandoObservacionId(null);
     load();
@@ -74,11 +77,13 @@ export function AsistenciaPage() {
       .finally(() => setLoadingHistorial(false));
   };
 
-  const planesActivosEnFecha = planesDelNino.filter((p) => {
-    const vigentePorFecha = p.fechaInicio <= fecha && (!p.fechaFin || p.fechaFin >= fecha);
-    const sesionesDisponibles = p.sesionesConsumidas < p.totalSesiones;
-    return vigentePorFecha && sesionesDisponibles;
-  });
+  const planesActivosEnFecha = useMemo(() => {
+    return planesDelNino.filter((p) => {
+      const vigentePorFecha = p.fechaInicio <= fecha && (!p.fechaFin || p.fechaFin >= fecha);
+      const sesionesDisponibles = p.sesionesConsumidas < p.totalSesiones;
+      return vigentePorFecha && sesionesDisponibles;
+    });
+  }, [planesDelNino, fecha]);
 
   useEffect(() => {
     if (!nuevaAsistenciaNinoId) {
@@ -88,23 +93,20 @@ export function AsistenciaPage() {
     api.get<PlanNino[]>(`/planes/nino/${nuevaAsistenciaNinoId}`).then(setPlanesDelNino).catch(() => setPlanesDelNino([]));
   }, [nuevaAsistenciaNinoId]);
 
-  // Cuando se selecciona un plan, si es PAQUETE cargar sus servicios
   useEffect(() => {
     setNuevaAsistenciaServicioId('');
     setServiciosDePaquete([]);
     if (!nuevaAsistenciaPlanId) return;
     const plan = planesActivosEnFecha.find(p => String(p.id) === nuevaAsistenciaPlanId);
     if (plan && plan.tipo === 'PAQUETE') {
-      // Obtener id del paquete desde el plan
-      api.get<{ idPaquete?: number; idServicio?: number }>(`/planes/${nuevaAsistenciaPlanId}`)
+      api.get<{ idPaquete?: number }>(`/planes/${nuevaAsistenciaPlanId}`)
         .then(planDetail => {
           if (planDetail.idPaquete) {
             api.get<{ servicios: ServicioPaquete[] }>(`/paquetes/${planDetail.idPaquete}`)
               .then(paq => setServiciosDePaquete(paq.servicios ?? []))
               .catch(() => setServiciosDePaquete([]));
           }
-        })
-        .catch(() => setServiciosDePaquete([]));
+        });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [nuevaAsistenciaPlanId]);
@@ -121,6 +123,7 @@ export function AsistenciaPage() {
   };
 
   const registrarEntrada = (idNino: number, idPlan: number | null, idServicio: number | null, obs: string) => {
+    setSendingEntrada(true);
     return api
       .post('/asistencia/entrada?' + buildParams(idNino, idPlan, idServicio, obs))
       .then(() => {
@@ -130,7 +133,8 @@ export function AsistenciaPage() {
         setNuevaAsistenciaServicioId('');
         setServiciosDePaquete([]);
       })
-      .catch((e) => setError(e.message));
+      .catch((e) => setError(e.message))
+      .finally(() => setSendingEntrada(false));
   };
 
   const registrarSalida = (idNino: number, idPlan: number | null, idAsistencia: number) => {
@@ -139,10 +143,6 @@ export function AsistenciaPage() {
       .post('/asistencia/salida?' + buildParams(idNino, idPlan, null, obs))
       .then(load)
       .catch((e) => setError(e.message));
-  };
-
-  const setObservacion = (idAsistencia: number, value: string) => {
-    setObservacionPorAsistenciaId((prev) => ({ ...prev, [idAsistencia]: value }));
   };
 
   const guardarObservacion = (idAsistencia: number) => {
@@ -156,16 +156,6 @@ export function AsistenciaPage() {
       .catch((e) => setError(e.message));
   };
 
-  const abrirEditarObservacion = (idAsistencia: number, valorActual: string) => {
-    setObservacionPorAsistenciaId((prev) => ({ ...prev, [idAsistencia]: valorActual }));
-    setEditandoObservacionId(idAsistencia);
-  };
-
-  const cancelarEditarObservacion = (idAsistencia: number, valorOriginal: string) => {
-    setObservacionPorAsistenciaId((prev) => ({ ...prev, [idAsistencia]: valorOriginal }));
-    setEditandoObservacionId(null);
-  };
-
   const submitNuevaAsistencia = (e: React.FormEvent) => {
     e.preventDefault();
     if (!nuevaAsistenciaNinoId) return;
@@ -174,58 +164,58 @@ export function AsistenciaPage() {
     registrarEntrada(Number(nuevaAsistenciaNinoId), idPlan, idServicio, '');
   };
 
-  if (error) return <p className="text-[#d93025] font-medium">{error}</p>;
+  const isToday = fecha === new Date().toISOString().slice(0, 10);
 
   return (
-    <div className="max-w-6xl space-y-10">
-      <header>
-        <h2 className="text-2xl font-normal text-[#202124]">Asistencia Diaria</h2>
-        <p className="mt-1 text-sm text-[#5f6368]">
-          Monitorea y registra los tiempos de entrada y salida de todos los estudiantes activos en tiempo real.
-        </p>
+    <div className="max-w-7xl mx-auto space-y-10 pb-20">
+      <header className="animate-fade-in">
+        <div className="flex items-center justify-between">
+          <div>
+            <div className="flex items-center gap-3 mb-2">
+              <div className="h-2 w-10 bg-[#2d1b69] rounded-full" />
+              <span className="text-[10px] font-extrabold text-[#2d1b69] uppercase tracking-[0.2em]">Operación Diaria</span>
+            </div>
+            <h2 className="text-4xl font-extrabold text-[#111827] tracking-tight">Registro de Asistencia</h2>
+            <p className="mt-2 text-sm text-[#4b5563] max-w-2xl">
+              Control en tiempo real de entradas y salidas. Gestiona la asistencia de los niños y mantén un historial detallado.
+            </p>
+          </div>
+          <div className="flex flex-col items-end gap-2">
+             <label className="text-[10px] font-black text-[#9ca3af] uppercase tracking-widest">Fecha de Gestión</label>
+             <input
+                type="date"
+                value={fecha}
+                onChange={(e) => setFecha(e.target.value)}
+                className="rounded-2xl border-2 border-[#f1f3f4] bg-white px-5 py-3 text-sm font-bold focus:border-[#2d1b69] focus:outline-none transition-all shadow-sm"
+              />
+          </div>
+        </div>
       </header>
 
       <div className="grid gap-8 lg:grid-cols-12">
-        {/* Main Attendance Section */}
-        <section className="lg:col-span-12 space-y-6">
-          <div className="flex flex-col gap-6 md:flex-row md:items-end md:justify-between bg-white p-6 rounded-xl border border-[#dadce0] shadow-sm">
-            <div className="space-y-4 flex-1">
-              <h3 className="text-sm font-medium text-[#202124] uppercase tracking-wider">Control de Registros</h3>
-              <div className="flex items-center gap-4">
-                <div className="space-y-1">
-                  <label className="block text-[11px] font-bold text-[#5f6368] uppercase">Fecha de Visualización</label>
-                  <input
-                    type="date"
-                    value={fecha}
-                    onChange={(e) => setFecha(e.target.value)}
-                    className="rounded-md border border-[#dadce0] bg-[#f8f9fa] px-3 py-2 text-sm focus:border-[#1a73e8] focus:bg-white focus:outline-none focus:ring-1 focus:ring-[#1a73e8] transition-all"
-                  />
-                </div>
-              </div>
-            </div>
-
-            <form onSubmit={submitNuevaAsistencia} className="flex flex-wrap items-end gap-3 p-4 bg-[#f8f9fa] rounded-lg border border-[#e8eaed]">
-              <div className="space-y-1">
-                <label className="block text-[11px] font-bold text-[#5f6368] uppercase">Estudiante</label>
+        {/* Registration Bar */}
+        <section className="lg:col-span-12">
+          <div className="google-card !p-2 bg-white border-none shadow-2xl shadow-indigo-100/30">
+            <form onSubmit={submitNuevaAsistencia} className="flex flex-wrap items-center gap-3 p-3">
+              <div className="flex-1 min-w-[200px]">
                 <select
                   value={nuevaAsistenciaNinoId}
                   onChange={(e) => setNuevaAsistenciaNinoId(e.target.value)}
-                  className="w-48 rounded-md border border-[#dadce0] bg-white px-3 py-2 text-sm focus:border-[#1a73e8] focus:outline-none focus:ring-1 focus:ring-[#1a73e8]"
+                  className="w-full rounded-xl border-none bg-indigo-50/50 px-4 py-3 text-sm font-bold text-[#2d1b69] focus:ring-2 focus:ring-[#2d1b69] transition-all"
                 >
-                  <option value="">Seleccionar...</option>
+                  <option value="">Seleccionar Estudiante...</option>
                   {ninos.map((n) => (
                     <option key={n.id} value={n.id}>{n.nombre}</option>
                   ))}
                 </select>
               </div>
-              <div className="space-y-1">
-                <label className="block text-[11px] font-bold text-[#5f6368] uppercase">Vinculación Plan</label>
+              <div className="flex-1 min-w-[250px]">
                 <select
                   value={nuevaAsistenciaPlanId}
-                  onChange={(e) => { setNuevaAsistenciaPlanId(e.target.value); }}
-                  className="w-48 rounded-md border border-[#dadce0] bg-white px-3 py-2 text-sm focus:border-[#1a73e8] focus:outline-none focus:ring-1 focus:ring-[#1a73e8]"
+                  onChange={(e) => setNuevaAsistenciaPlanId(e.target.value)}
+                  className={`w-full rounded-xl border-none bg-indigo-50/50 px-4 py-3 text-sm font-bold transition-all ${nuevaAsistenciaPlanId ? 'text-[#2d1b69]' : 'text-[#9ca3af]'}`}
                 >
-                  <option value="">Sin plan asignado</option>
+                  <option value="">Sin plan asignado / Cortesía</option>
                   {planesActivosEnFecha.map((p) => (
                     <option key={p.id} value={p.id}>
                       {p.nombrePlan ?? `${p.tipo} #${p.id}`} ({p.totalSesiones - p.sesionesConsumidas} sesion(es) rest.)
@@ -233,18 +223,13 @@ export function AsistenciaPage() {
                   ))}
                 </select>
               </div>
-              {/* Selector de servicio del paquete */}
-              {serviciosDePaquete.length > 0 ? (
-                <div className="space-y-1 animate-scale-in">
-                  <label className="block text-[11px] font-bold text-[#2d1b69] uppercase">
-                    Servicio del Paquete
-                    <span className="ml-1 text-rose-500">*</span>
-                  </label>
+              
+              {serviciosDePaquete.length > 0 && (
+                <div className="animate-scale-in">
                   <select
                     value={nuevaAsistenciaServicioId}
                     onChange={(e) => setNuevaAsistenciaServicioId(e.target.value)}
-                    className={`w-52 rounded-md border-2 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-200 transition-all ${nuevaAsistenciaServicioId ? 'border-indigo-200' : 'border-indigo-500 animate-pulse'
-                      }`}
+                    className="w-56 rounded-xl border-2 border-[#2d1b69]/20 bg-white px-4 py-3 text-sm font-bold text-[#2d1b69] focus:ring-2 focus:ring-[#2d1b69]"
                     required
                   >
                     <option value="">-- Elige Servicio --</option>
@@ -253,193 +238,204 @@ export function AsistenciaPage() {
                     ))}
                   </select>
                 </div>
-              ) : (
-                nuevaAsistenciaPlanId && planesActivosEnFecha.find(p => String(p.id) === nuevaAsistenciaPlanId)?.tipo === 'PAQUETE' && (
-                  <div className="flex items-center gap-2 px-3 py-2 bg-indigo-50 rounded-md border border-indigo-100">
-                    <div className="h-3 w-3 border-2 border-purple-400 border-t-transparent rounded-full animate-spin" />
-                    <span className="text-[10px] text-purple-700 font-medium italic">Buscando servicios...</span>
-                  </div>
-                )
               )}
+
               <button
                 type="submit"
-                disabled={!nuevaAsistenciaNinoId || (serviciosDePaquete.length > 0 && !nuevaAsistenciaServicioId)}
-                className="google-button-primary h-[38px] flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                disabled={sendingEntrada || !nuevaAsistenciaNinoId || (serviciosDePaquete.length > 0 && !nuevaAsistenciaServicioId)}
+                className="google-button-primary disabled:opacity-50"
               >
-                Registrar Entrada
+                {sendingEntrada ? 'Procesando...' : 'Registrar Entrada'}
               </button>
             </form>
           </div>
-
-          <div className="bg-white rounded-xl border border-[#dadce0] overflow-hidden shadow-sm">
-            {loading ? (
-              <div className="p-8 space-y-4">
-                <div className="h-4 w-full bg-[#f1f3f4] animate-pulse rounded" />
-                <div className="h-4 w-5/6 bg-[#f1f3f4] animate-pulse rounded" />
-              </div>
-            ) : (
-              <div className="overflow-x-auto">
-                <table className="min-w-full divide-y divide-[#f1f3f4]">
-                  <thead className="bg-[#f8f9fa]">
-                    <tr>
-                      <th className="px-6 py-4 text-left text-[11px] font-bold text-[#5f6368] uppercase tracking-wider">Estudiante</th>
-                      <th className="px-6 py-4 text-left text-[11px] font-bold text-[#5f6368] uppercase tracking-wider">Plan / Referencia</th>
-                      <th className="px-6 py-4 text-left text-[11px] font-bold text-[#5f6368] uppercase tracking-wider">Entrada</th>
-                      <th className="px-6 py-4 text-left text-[11px] font-bold text-[#5f6368] uppercase tracking-wider">Salida</th>
-                      <th className="px-6 py-4 text-left text-[11px] font-bold text-[#5f6368] uppercase tracking-wider">Observaciones</th>
-                      <th className="px-6 py-4 text-right text-[11px] font-bold text-[#5f6368] uppercase tracking-wider">Acciones</th>
-                    </tr>
-                  </thead>
-                  <tbody className="bg-white divide-y divide-[#f1f3f4]">
-                    {asistencia.length === 0 ? (
-                      <tr>
-                        <td colSpan={6} className="px-6 py-12 text-center text-sm text-[#5f6368]">
-                          No se han encontrado registros para esta fecha.
-                        </td>
-                      </tr>
-                    ) : asistencia.map((a) => {
-                      const observacionValue = a.id in observacionPorAsistenciaId ? observacionPorAsistenciaId[a.id] : (a.observacion ?? '');
-                      const estaEditando = editandoObservacionId === a.id;
-                      return (
-                        <tr key={a.id} className="hover:bg-[#f8f9fa] transition-colors group">
-                          <td className="px-6 py-4 text-sm font-medium text-[#202124]">{a.nino?.nombre ?? a.idNino}</td>
-                          <td className="px-6 py-4 text-sm text-[#5f6368]">
-                            {a.nombreServicio
-                              ? <span className="font-medium text-[#2d1b69]">{a.nombrePlan} <span className="text-[10px] text-[#4b5563]">›</span> {a.nombreServicio}</span>
-                              : (a.nombrePlan ?? 'Servicio Individual')}
-                          </td>
-                          <td className="px-6 py-4 text-sm font-mono text-[#5f6368]">{a.horaEntrada ?? '--:--'}</td>
-                          <td className="px-6 py-4 text-sm font-mono text-[#5f6368]">{a.horaSalida ?? '--:--'}</td>
-                          <td className="px-6 py-4 max-w-xs">
-                            {estaEditando ? (
-                              <div className="flex flex-col gap-2">
-                                <textarea
-                                  value={observacionValue}
-                                  onChange={(e) => setObservacion(a.id, e.target.value)}
-                                  className="w-full rounded-md border border-[#dadce0] p-2 text-xs focus:border-[#1a73e8] focus:outline-none"
-                                  rows={2}
-                                />
-                                <div className="flex gap-2">
-                                  <button onClick={() => guardarObservacion(a.id)} className="text-[10px] bg-[#1a73e8] text-white px-2 py-1 rounded hover:bg-[#1557b0]">Guardar</button>
-                                  <button onClick={() => cancelarEditarObservacion(a.id, a.observacion ?? '')} className="text-[10px] text-[#5f6368] px-2 py-1 hover:bg-[#e8eaed] rounded">Cerrar</button>
-                                </div>
-                              </div>
-                            ) : (
-                              <div className="flex items-start justify-between gap-2">
-                                <span className="text-xs text-[#5f6368] line-clamp-2 italic">{a.observacion?.trim() || 'Sin notas'}</span>
-                                <button onClick={() => abrirEditarObservacion(a.id, a.observacion ?? '')} className="opacity-0 group-hover:opacity-100 text-[#1a73e8] p-1 rounded hover:bg-[#e8f0fe] transition-all">
-                                  <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
-                                </button>
-                              </div>
-                            )}
-                          </td>
-                          <td className="px-6 py-4 text-right">
-                            {a.horaEntrada && !a.horaSalida && (
-                              <button
-                                onClick={() => registrarSalida(a.idNino, a.idPlan, a.id)}
-                                className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-[#fbbc04] hover:bg-[#f57c00] focus:outline-none transition-colors"
-                              >
-                                Registrar Salida
-                              </button>
-                            )}
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </div>
         </section>
 
-        {/* History Section */}
-        <section className="lg:col-span-12 mt-4">
-          <div className="bg-white rounded-xl border border-[#dadce0] shadow-sm p-6 space-y-8">
-            <div className="flex flex-col gap-2">
-              <h3 className="text-lg font-normal text-[#202124]">Historial de Asistencia Integral</h3>
-              <p className="text-sm text-[#5f6368]">Consulta el registro histórico de un estudiante específico entre un rango de fechas determinado.</p>
-            </div>
-
-            <div className="flex flex-wrap items-end gap-6 pb-6 border-b border-[#f1f3f4]">
-              <div className="space-y-1">
-                <label className="block text-xs font-medium text-[#5f6368] uppercase">Estudiante</label>
-                <select
-                  id="historial-nino"
-                  value={historialNinoId}
-                  onChange={(e) => setHistorialNinoId(e.target.value)}
-                  className="w-64 rounded-md border border-[#dadce0] bg-white px-3 py-2 text-sm focus:border-[#1a73e8] focus:outline-none focus:ring-1 focus:ring-[#1a73e8]"
-                >
-                  {ninos.map((n) => (
-                    <option key={n.id} value={n.id}>{n.nombre}</option>
-                  ))}
-                </select>
-              </div>
-              <div className="space-y-1">
-                <label className="block text-xs font-medium text-[#5f6368] uppercase">Fecha Inicio</label>
-                <input
-                  type="date"
-                  value={historialDesde}
-                  onChange={(e) => setHistorialDesde(e.target.value)}
-                  className="rounded-md border border-[#dadce0] bg-white px-3 py-2 text-sm focus:border-[#1a73e8] focus:outline-none focus:ring-1 focus:ring-[#1a73e8]"
-                />
-              </div>
-              <div className="space-y-1">
-                <label className="block text-xs font-medium text-[#5f6368] uppercase">Fecha Fin</label>
-                <input
-                  type="date"
-                  value={historialHasta}
-                  onChange={(e) => setHistorialHasta(e.target.value)}
-                  className="rounded-md border border-[#dadce0] bg-white px-3 py-2 text-sm focus:border-[#1a73e8] focus:outline-none focus:ring-1 focus:ring-[#1a73e8]"
-                />
-              </div>
-              <button
-                onClick={verHistorial}
-                disabled={loadingHistorial || !historialNinoId}
-                className="google-button-secondary h-[38px] flex items-center gap-2"
-              >
-                {loadingHistorial ? 'Procesando...' : 'Consultar Historial'}
-              </button>
-            </div>
-
-            {loadingHistorial ? (
-              <div className="flex justify-center py-12">
-                <div className="animate-spin h-8 w-8 border-4 border-[#1a73e8] border-t-transparent rounded-full" />
-              </div>
-            ) : historialData.length > 0 ? (
-              <div className="overflow-x-auto rounded-lg border border-[#f1f3f4]">
-                <table className="min-w-full divide-y divide-[#f1f3f4]">
-                  <thead className="bg-[#f8f9fa]">
-                    <tr>
-                      <th className="px-6 py-3 text-left text-[10px] font-bold text-[#5f6368] uppercase">Fecha</th>
-                      <th className="px-6 py-3 text-left text-[10px] font-bold text-[#5f6368] uppercase">Entrada</th>
-                      <th className="px-6 py-3 text-left text-[10px] font-bold text-[#5f6368] uppercase">Salida</th>
-                      <th className="px-6 py-3 text-left text-[10px] font-bold text-[#5f6368] uppercase">Notas</th>
-                    </tr>
-                  </thead>
-                  <tbody className="bg-white divide-y divide-[#f1f3f4]">
-                    {historialData.map((r) => (
-                      <tr key={r.id} className="hover:bg-[#f8f9fa]">
-                        <td className="px-6 py-3 text-sm text-[#202124]">{r.fecha}</td>
-                        <td className="px-6 py-3 text-sm text-[#5f6368] font-mono">{r.horaEntrada ?? '-'}</td>
-                        <td className="px-6 py-3 text-sm text-[#5f6368] font-mono">{r.horaSalida ?? '-'}</td>
-                        <td className="px-6 py-3 text-sm text-[#5f6368] italic max-w-sm truncate" title={r.observacion ?? ''}>
-                          {r.observacion ?? '--'}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            ) : (
-              <div className="py-8 text-center bg-[#f8f9fa] rounded-lg border border-dashed border-[#dadce0]">
-                <p className="text-sm text-[#5f6368]">No se encontró información histórica con los parámetros seleccionados.</p>
-              </div>
+        {/* Attendance Dashboard - Live View */}
+        <section className="lg:col-span-12 space-y-6">
+          <div className="flex items-center justify-between">
+            <h3 className="text-xs font-black text-[#5f6368] uppercase tracking-[0.25em]">Niños registrados en {isToday ? 'Sala Ahora' : 'esta fecha'}</h3>
+            {asistencia.length > 0 && (
+              <span className="px-3 py-1 bg-[#e0f7fa] text-[#006064] text-[10px] font-black uppercase rounded-full">
+                {asistencia.filter(a => !a.horaSalida).length} En Sala / {asistencia.length} Registrados
+              </span>
             )}
+          </div>
+
+          <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+            {loading ? (
+              Array.from({ length: 3 }).map((_, i) => (
+                <div key={i} className="google-card animate-pulse border-none h-64 bg-gray-50/50" />
+              ))
+            ) : asistencia.length === 0 ? (
+              <div className="col-span-full py-20 text-center google-card border-dashed border-gray-200 bg-gray-50/50">
+                <div className="h-16 w-16 rounded-full bg-gray-100 flex items-center justify-center mx-auto mb-4 text-gray-300">
+                  <svg className="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                </div>
+                <p className="text-sm font-bold text-[#9ca3af]">No hay niños registrados en esta fecha.</p>
+                <p className="text-xs text-gray-400 mt-1">Usa la barra superior para registrar una nueva entrada.</p>
+              </div>
+            ) : asistencia.map((a, idx) => {
+              const estaEnSala = a.horaEntrada && !a.horaSalida;
+              const obs = observacionPorAsistenciaId[a.id] ?? (a.observacion ?? '');
+              return (
+                <div 
+                  key={a.id} 
+                  className={`google-card animate-scale-in stagger-${(idx % 5) + 1} relative overflow-hidden transition-all duration-500 border-none group ${
+                    estaEnSala ? 'ring-2 ring-emerald-400 bg-white shadow-xl shadow-emerald-50' : 'opacity-80 bg-gray-50 border border-gray-100 grayscale-[0.3]'
+                  }`}
+                >
+                  {/* Status Indicator */}
+                  {estaEnSala && (
+                    <div className="absolute top-4 right-4 flex items-center gap-2">
+                       <span className="relative flex h-2.5 w-2.5">
+                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                        <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500"></span>
+                      </span>
+                      <span className="text-[10px] font-black text-emerald-600 uppercase tracking-widest">En Sala</span>
+                    </div>
+                  )}
+
+                  <p className="text-[9px] font-black text-[#9ca3af] uppercase tracking-widest mb-1">{a.nombrePlan ?? 'Servicio Individual'}</p>
+                  <h4 className="text-lg font-black text-[#111827] mb-4 truncate">{a.nino?.nombre}</h4>
+                  
+                  <div className="grid grid-cols-2 gap-4 p-4 rounded-2xl bg-indigo-50/30 mb-4 border border-indigo-50/50">
+                    <div>
+                      <p className="text-[10px] font-bold text-[#4c1d95] uppercase tracking-widest opacity-60">Entrada</p>
+                      <p className="text-lg font-black text-[#2d1b69] font-mono tracking-tighter">{a.horaEntrada ?? '--:--'}</p>
+                    </div>
+                    <div>
+                      <p className="text-[10px] font-bold text-[#4c1d95] uppercase tracking-widest opacity-60">Salida</p>
+                      <p className={`text-lg font-black font-mono tracking-tighter ${a.horaSalida ? 'text-[#2d1b69]' : 'text-[#9ca3af]'}`}>{a.horaSalida ?? '--:--'}</p>
+                    </div>
+                  </div>
+
+                  <div className="space-y-4">
+                    {/* Nota Section */}
+                    {editandoObservacionId === a.id ? (
+                      <div className="animate-fade-in space-y-2">
+                         <textarea
+                          value={obs}
+                          onChange={(e) => setObservacionPorAsistenciaId(prev => ({ ...prev, [a.id]: e.target.value }))}
+                          className="w-full rounded-xl border border-indigo-100 p-3 text-xs font-bold text-[#4b5563] focus:border-[#2d1b69] focus:outline-none bg-white"
+                          rows={2}
+                          placeholder="Añadir nota..."
+                        />
+                        <div className="flex gap-2">
+                          <button onClick={() => guardarObservacion(a.id)} className="flex-1 text-[10px] bg-[#2d1b69] text-white py-2 rounded-lg font-black uppercase hover:bg-[#1a0a4a]">Guardar</button>
+                          <button onClick={() => setEditandoObservacionId(null)} className="flex-1 text-[10px] text-[#5f6368] py-2 border border-gray-200 rounded-lg font-black uppercase hover:bg-gray-100">Cancelar</button>
+                        </div>
+                      </div>
+                    ) : (
+                      <div 
+                    onClick={() => setEditandoObservacionId(a.id)}
+                    className="cursor-pointer group/obs p-3 rounded-xl border border-dashed border-gray-200 hover:border-[#2d1b69] transition-all bg-white"
+                  >
+                         <p className="text-[10px] font-black text-[#9ca3af] uppercase mb-1">Notas</p>
+                         <p className={`text-xs italic truncate ${a.observacion ? 'text-[#4b5563] font-medium' : 'text-gray-300'}`}>
+                           {a.observacion || 'Pulsa para añadir nota...'}
+                         </p>
+                  </div>
+                    )}
+
+                    {estaEnSala && (
+                      <button
+                        onClick={() => registrarSalida(a.idNino, a.idPlan, a.id)}
+                        className="w-full py-4 rounded-2xl bg-gradient-to-r from-amber-400 to-orange-500 text-white font-black text-xs uppercase tracking-widest hover:shadow-lg hover:shadow-orange-200 transition-all hover:-translate-y-0.5 active:scale-95"
+                      >
+                        Registrar Salida
+                      </button>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+          {error && (
+            <div className="p-4 bg-rose-50 border border-rose-100 rounded-xl">
+              <p className="text-xs font-bold text-rose-600">Error: {error}</p>
+            </div>
+          )}
+        </section>
+
+        {/* History Section - Redesigned Viewer */}
+        <section className="lg:col-span-12 mt-10">
+          <div className="google-card !p-0 border-none shadow-2xl shadow-indigo-100/20 overflow-hidden">
+            <div className="bg-[#111827] p-8 text-white">
+              <h3 className="text-lg font-black tracking-tight mb-1">Historial Maestro de Asistencia</h3>
+              <p className="text-xs text-gray-400 font-medium">Consulta el registro detallado por estudiante y rango de fechas.</p>
+              
+              <div className="grid gap-6 sm:grid-cols-4 mt-8">
+                <div className="flex flex-col gap-2">
+                  <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest">Estudiante</label>
+                  <select
+                    value={historialNinoId}
+                    onChange={(e) => setHistorialNinoId(e.target.value)}
+                    className="w-full bg-[#1f2937] border-none rounded-xl px-4 py-3 text-sm font-bold text-white focus:ring-2 focus:ring-[#c026d3]"
+                  >
+                    {ninos.map((n) => (
+                      <option key={n.id} value={n.id}>{n.nombre}</option>
+                    ))}
+                  </select>
+                </div>
+                <div className="flex flex-col gap-2">
+                   <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest">Desde</label>
+                   <input type="date" value={historialDesde} onChange={e => setHistorialDesde(e.target.value)} className="w-full bg-[#1f2937] border-none rounded-xl px-4 py-3 text-sm font-bold text-white focus:ring-2 focus:ring-[#c026d3]" />
+                </div>
+                <div className="flex flex-col gap-2">
+                   <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest">Hasta</label>
+                   <input type="date" value={historialHasta} onChange={e => setHistorialHasta(e.target.value)} className="w-full bg-[#1f2937] border-none rounded-xl px-4 py-3 text-sm font-bold text-white focus:ring-2 focus:ring-[#c026d3]" />
+                </div>
+                <div className="flex items-end">
+                   <button 
+                    onClick={verHistorial} 
+                    disabled={loadingHistorial}
+                    className="w-full bg-gradient-to-r from-[#c026d3] to-[#2d1b69] hover:from-[#c026d3]/80 hover:to-[#2d1b69]/80 text-white font-black text-xs uppercase tracking-widest px-6 py-3.5 rounded-xl transition-all active:scale-95"
+                   >
+                     {loadingHistorial ? 'Buscando...' : 'Consultar'}
+                   </button>
+                </div>
+              </div>
+            </div>
+
+            <div className="p-8">
+              {loadingHistorial ? (
+                <div className="py-20 text-center animate-pulse">
+                   <div className="h-10 w-10 border-4 border-[#06b6d4] border-t-transparent rounded-full animate-spin mx-auto mb-4" />
+                   <p className="text-sm font-bold text-[#4b5563]">Cargando cronograma histórico...</p>
+                </div>
+              ) : historialData.length > 0 ? (
+                <div className="overflow-x-auto">
+                   <table className="w-full text-left">
+                    <thead>
+                      <tr className="border-b border-gray-100">
+                        <th className="pb-4 text-[10px] font-black text-[#9ca3af] uppercase tracking-widest">Fecha</th>
+                        <th className="pb-4 text-[10px] font-black text-[#9ca3af] uppercase tracking-widest">Entrada</th>
+                        <th className="pb-4 text-[10px] font-black text-[#9ca3af] uppercase tracking-widest">Salida</th>
+                        <th className="pb-4 text-[10px] font-black text-[#9ca3af] uppercase tracking-widest">Observación</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-50">
+                      {historialData.map((r) => (
+                        <tr key={r.id} className="hover:bg-gray-50/50 transition-colors">
+                          <td className="py-4 text-sm font-extrabold text-[#111827]">{r.fecha}</td>
+                          <td className="py-4 text-sm font-black text-[#2d1b69] font-mono">{r.horaEntrada ?? '--:--'}</td>
+                          <td className="py-4 text-sm font-black text-[#2d1b69] font-mono">{r.horaSalida ?? '--:--'}</td>
+                          <td className="py-4 text-xs italic text-[#4b5563] max-w-sm truncate">{r.observacion || '-'}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                   </table>
+                </div>
+              ) : (
+                <div className="py-20 text-center border-2 border-dashed border-gray-100 rounded-3xl">
+                   <p className="text-sm font-bold text-[#9ca3af]">Ingresa los parámetros y pulsa consultar para ver el historial.</p>
+                </div>
+              )}
+            </div>
           </div>
         </section>
       </div>
     </div>
   );
 }
-
