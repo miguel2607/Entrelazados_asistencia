@@ -38,10 +38,11 @@ public class AsistenciaController {
             @RequestParam(required = false) Integer idServicio,
             @RequestParam(required = false) LocalDate fecha,
             @RequestParam(required = false) LocalTime horaEntrada,
+            @RequestParam(required = false) String jornada,
             @RequestParam(required = false) String observacion) {
         LocalDate f = fecha != null ? fecha : LocalDate.now();
         LocalTime h = horaEntrada != null ? horaEntrada : LocalTime.now();
-        Asistencia a = asistenciaService.registrarEntrada(idNino, idPlan, idServicio, f, h, observacion);
+        Asistencia a = asistenciaService.registrarEntrada(idNino, idPlan, idServicio, f, h, jornada, observacion);
         return toMap(a);
     }
 

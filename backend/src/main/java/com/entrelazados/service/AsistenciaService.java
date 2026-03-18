@@ -29,12 +29,14 @@ public class AsistenciaService {
 
     @Transactional
     public Asistencia registrarEntrada(Integer idNino, Integer idPlan, Integer idServicio, LocalDate fecha,
-            LocalTime horaEntrada, String observacion) {
+            LocalTime horaEntrada, String jornada, String observacion) {
         if (!ninoService.existePorId(idNino))
             throw new RecursoNoEncontradoException("Niño no encontrado");
 
-        // Si hay un plan, descontar sesión
-        if (idPlan != null) {
+        // Regla: Solo descontar 1 sesión por día para el niño (sin importar jornada)
+        boolean yaAsistioHoy = repo.existsByIdNinoAndFecha(idNino, fecha);
+
+        if (idPlan != null && !yaAsistioHoy) {
             NinoPlanEntity plan = planRepo.findById(idPlan)
                     .orElseThrow(() -> new RecursoNoEncontradoException("Plan no encontrado"));
 
@@ -46,8 +48,15 @@ public class AsistenciaService {
             planRepo.save(plan);
         }
 
-        if (repo.existsByIdNinoAndFechaAndIdPlan(idNino, fecha, idPlan))
-            throw new ConflictoException("Ya existe registro de asistencia para este niño en la fecha");
+        // Validación: No permitir entrada si ya está adentro (sin salida)
+        if (repo.findTopByIdNinoAndFechaAndHoraSalidaIsNullOrderByIdDesc(idNino, fecha).isPresent()) {
+            throw new ConflictoException("El niño ya tiene una entrada activa registrada hoy. Debe registrar su salida primero.");
+        }
+
+        // Validación: No permitir repetir la misma jornada si se especifica
+        if (jornada != null && repo.existsByIdNinoAndFechaAndJornada(idNino, fecha, jornada)) {
+            throw new ConflictoException("Ya existe un registro para la jornada '" + jornada + "' en esta fecha.");
+        }
 
         AsistenciaEntity e = new AsistenciaEntity();
         e.setIdNino(idNino);
@@ -55,6 +64,7 @@ public class AsistenciaService {
         e.setIdServicio(idServicio);
         e.setFecha(fecha);
         e.setHoraEntrada(horaEntrada);
+        e.setJornada(jornada);
         e.setObservacion(observacion);
         return toDomain(repo.save(e));
     }
@@ -64,10 +74,11 @@ public class AsistenciaService {
             String observacion) {
         if (!ninoService.existePorId(idNino))
             throw new RecursoNoEncontradoException("Niño no encontrado");
-        AsistenciaEntity e = repo.findByIdNinoAndFechaAndIdPlan(idNino, fecha, idPlan)
-                .orElseThrow(() -> new RecursoNoEncontradoException("Asistencia no encontrada"));
-        if (e.getHoraSalida() != null)
-            throw new ConflictoException("Ya está registrada la salida");
+            
+        // Buscar la entrada más reciente que no tenga salida
+        AsistenciaEntity e = repo.findTopByIdNinoAndFechaAndHoraSalidaIsNullOrderByIdDesc(idNino, fecha)
+                .orElseThrow(() -> new RecursoNoEncontradoException("No se encontró una entrada activa para registrar la salida"));
+                
         e.setHoraSalida(horaSalida);
         if (observacion != null)
             e.setObservacion(observacion);
@@ -102,6 +113,6 @@ public class AsistenciaService {
 
     private Asistencia toDomain(AsistenciaEntity e) {
         return new Asistencia(e.getId(), e.getIdNino(), e.getIdPlan(), e.getIdServicio(), e.getFecha(),
-                e.getHoraEntrada(), e.getHoraSalida(), e.getObservacion());
+                e.getHoraEntrada(), e.getHoraSalida(), e.getJornada(), e.getObservacion());
     }
 }

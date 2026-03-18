@@ -13,6 +13,12 @@ public interface AsistenciaJpaRepository extends JpaRepository<AsistenciaEntity,
 
     Optional<AsistenciaEntity> findByIdNinoAndFechaAndIdPlan(Integer idNino, LocalDate fecha, Integer idPlan);
 
+    Optional<AsistenciaEntity> findTopByIdNinoAndFechaAndHoraSalidaIsNullOrderByIdDesc(Integer idNino, LocalDate fecha);
+
+    boolean existsByIdNinoAndFecha(Integer idNino, LocalDate fecha);
+
+    boolean existsByIdNinoAndFechaAndJornada(Integer idNino, LocalDate fecha, String jornada);
+
     boolean existsByIdNinoAndFechaAndIdPlan(Integer idNino, LocalDate fecha, Integer idPlan);
 
     List<AsistenciaEntity> findByIdNinoAndFechaOrderByIdAsc(Integer idNino, LocalDate fecha);

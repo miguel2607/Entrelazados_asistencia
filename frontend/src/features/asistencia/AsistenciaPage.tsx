@@ -12,6 +12,7 @@ type AsistenciaItem = {
   fecha?: string;
   horaEntrada: string | null;
   horaSalida: string | null;
+  jornada: string | null;
   observacion: string | null;
   nino: { nombre: string };
 };
@@ -37,6 +38,10 @@ export function AsistenciaPage() {
   const [nuevaAsistenciaNinoId, setNuevaAsistenciaNinoId] = useState<string>('');
   const [nuevaAsistenciaPlanId, setNuevaAsistenciaPlanId] = useState<string>('');
   const [nuevaAsistenciaServicioId, setNuevaAsistenciaServicioId] = useState<string>('');
+  const [nuevaAsistenciaJornada, setNuevaAsistenciaJornada] = useState<string>(() => {
+    const hour = new Date().getHours();
+    return hour < 13 ? 'MAÑANA' : 'TARDE';
+  });
   const [planesDelNino, setPlanesDelNino] = useState<PlanNino[]>([]);
   const [serviciosDePaquete, setServiciosDePaquete] = useState<ServicioPaquete[]>([]);
   const [sendingEntrada, setSendingEntrada] = useState(false);
@@ -111,21 +116,22 @@ export function AsistenciaPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [nuevaAsistenciaPlanId]);
 
-  const buildParams = (idNino: number, idPlan: number | null, idServicio: number | null, obs: string) => {
+  const buildParams = (idNino: number, idPlan: number | null, idServicio: number | null, jornada: string, obs: string) => {
     const p = new URLSearchParams();
     p.set('idNino', String(idNino));
     p.set('fecha', fecha);
     if (idPlan != null) p.set('idPlan', String(idPlan));
     if (idServicio != null) p.set('idServicio', String(idServicio));
+    if (jornada) p.set('jornada', jornada);
     const o = obs?.trim();
     if (o) p.set('observacion', o);
     return p.toString();
   };
 
-  const registrarEntrada = (idNino: number, idPlan: number | null, idServicio: number | null, obs: string) => {
+  const registrarEntrada = (idNino: number, idPlan: number | null, idServicio: number | null, jornada: string, obs: string) => {
     setSendingEntrada(true);
     return api
-      .post('/asistencia/entrada?' + buildParams(idNino, idPlan, idServicio, obs))
+      .post('/asistencia/entrada?' + buildParams(idNino, idPlan, idServicio, jornada, obs))
       .then(() => {
         load();
         setNuevaAsistenciaNinoId('');
@@ -140,7 +146,7 @@ export function AsistenciaPage() {
   const registrarSalida = (idNino: number, idPlan: number | null, idAsistencia: number) => {
     const obs = observacionPorAsistenciaId[idAsistencia] ?? '';
     return api
-      .post('/asistencia/salida?' + buildParams(idNino, idPlan, null, obs))
+      .post('/asistencia/salida?' + buildParams(idNino, idPlan, null, '', obs))
       .then(load)
       .catch((e) => setError(e.message));
   };
@@ -161,7 +167,7 @@ export function AsistenciaPage() {
     if (!nuevaAsistenciaNinoId) return;
     const idPlan = nuevaAsistenciaPlanId ? Number(nuevaAsistenciaPlanId) : null;
     const idServicio = nuevaAsistenciaServicioId ? Number(nuevaAsistenciaServicioId) : null;
-    registrarEntrada(Number(nuevaAsistenciaNinoId), idPlan, idServicio, '');
+    registrarEntrada(Number(nuevaAsistenciaNinoId), idPlan, idServicio, nuevaAsistenciaJornada, '');
   };
 
   const isToday = fecha === new Date().toISOString().slice(0, 10);
@@ -209,7 +215,7 @@ export function AsistenciaPage() {
                   ))}
                 </select>
               </div>
-              <div className="flex-1 min-w-[250px]">
+              <div className="flex-1 min-w-[200px]">
                 <select
                   value={nuevaAsistenciaPlanId}
                   onChange={(e) => setNuevaAsistenciaPlanId(e.target.value)}
@@ -221,6 +227,17 @@ export function AsistenciaPage() {
                       {p.nombrePlan ?? `${p.tipo} #${p.id}`} ({p.totalSesiones - p.sesionesConsumidas} sesion(es) rest.)
                     </option>
                   ))}
+                </select>
+              </div>
+
+              <div className="flex-1 min-w-[150px]">
+                <select
+                  value={nuevaAsistenciaJornada}
+                  onChange={(e) => setNuevaAsistenciaJornada(e.target.value)}
+                  className="w-full rounded-xl border-none bg-indigo-50/50 px-4 py-3 text-sm font-bold text-[#2d1b69] focus:ring-2 focus:ring-[#2d1b69]"
+                >
+                  <option value="MAÑANA">☀️ MAÑANA</option>
+                  <option value="TARDE">🌙 TARDE</option>
                 </select>
               </div>
               
@@ -296,7 +313,14 @@ export function AsistenciaPage() {
                     </div>
                   )}
 
-                  <p className="text-[9px] font-black text-[#9ca3af] uppercase tracking-widest mb-1">{a.nombrePlan ?? 'Servicio Individual'}</p>
+                  <div className="flex items-center justify-between mb-1">
+                    <p className="text-[9px] font-black text-[#9ca3af] uppercase tracking-widest">{a.nombrePlan ?? 'Servicio Individual'}</p>
+                    {a.jornada && (
+                      <span className="px-2 py-0.5 bg-indigo-100 text-[#2d1b69] text-[8px] font-black uppercase rounded-md tracking-tighter">
+                        {a.jornada === 'MAÑANA' ? '☀️ Mañana' : '🌙 Tarde'}
+                      </span>
+                    )}
+                  </div>
                   <h4 className="text-lg font-black text-[#111827] mb-4 truncate">{a.nino?.nombre}</h4>
                   
                   <div className="grid grid-cols-2 gap-4 p-4 rounded-2xl bg-indigo-50/30 mb-4 border border-indigo-50/50">
@@ -410,6 +434,7 @@ export function AsistenciaPage() {
                     <thead>
                       <tr className="border-b border-gray-100">
                         <th className="pb-4 text-[10px] font-black text-[#9ca3af] uppercase tracking-widest">Fecha</th>
+                        <th className="pb-4 text-[10px] font-black text-[#9ca3af] uppercase tracking-widest">Jornada</th>
                         <th className="pb-4 text-[10px] font-black text-[#9ca3af] uppercase tracking-widest">Entrada</th>
                         <th className="pb-4 text-[10px] font-black text-[#9ca3af] uppercase tracking-widest">Salida</th>
                         <th className="pb-4 text-[10px] font-black text-[#9ca3af] uppercase tracking-widest">Observación</th>
@@ -419,6 +444,9 @@ export function AsistenciaPage() {
                       {historialData.map((r) => (
                         <tr key={r.id} className="hover:bg-gray-50/50 transition-colors">
                           <td className="py-4 text-sm font-extrabold text-[#111827]">{r.fecha}</td>
+                          <td className="py-4 text-[10px] font-bold text-[#4b5563]">
+                            {r.jornada ? (r.jornada === 'MAÑANA' ? '☀️ Mañana' : '🌙 Tarde') : '-'}
+                          </td>
                           <td className="py-4 text-sm font-black text-[#2d1b69] font-mono">{r.horaEntrada ?? '--:--'}</td>
                           <td className="py-4 text-sm font-black text-[#2d1b69] font-mono">{r.horaSalida ?? '--:--'}</td>
                           <td className="py-4 text-xs italic text-[#4b5563] max-w-sm truncate">{r.observacion || '-'}</td>

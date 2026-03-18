@@ -24,6 +24,8 @@ public class AsistenciaEntity {
     private LocalTime horaEntrada;
     @Column(name = "hora_salida")
     private LocalTime horaSalida;
+    @Column(name = "jornada")
+    private String jornada;
     private String observacion;
 
     public Integer getId() {
@@ -88,5 +90,13 @@ public class AsistenciaEntity {
 
     public void setObservacion(String observacion) {
         this.observacion = observacion;
+    }
+
+    public String getJornada() {
+        return jornada;
+    }
+
+    public void setJornada(String jornada) {
+        this.jornada = jornada;
     }
 }
