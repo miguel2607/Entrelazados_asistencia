@@ -28,16 +28,25 @@ public class JwtAuthFilter extends OncePerRequestFilter {
                                     HttpServletResponse response,
                                     FilterChain filterChain) throws ServletException, IOException {
         String authHeader = request.getHeader("Authorization");
+        String path = request.getRequestURI();
 
         if (authHeader != null && authHeader.startsWith("Bearer ")) {
             String token = authHeader.substring(7);
+            System.out.println("[JWT Debug] Path: " + path + " - Token found");
             if (jwtUtil.validateToken(token)) {
                 String username = jwtUtil.extractUsername(token);
+                System.out.println("[JWT Debug] Token valid for user: " + username);
                 Authentication auth = new UsernamePasswordAuthenticationToken(
                         username, null,
                         List.of(new SimpleGrantedAuthority("ROLE_ADMIN"))
                 );
                 SecurityContextHolder.getContext().setAuthentication(auth);
+            } else {
+                System.out.println("[JWT Debug] Token validation FAILED for path: " + path);
+            }
+        } else {
+            if (!path.contains("/auth/") && !path.contains("/health")) {
+                System.out.println("[JWT Debug] No Authorization header found for path: " + path);
             }
         }
         filterChain.doFilter(request, response);

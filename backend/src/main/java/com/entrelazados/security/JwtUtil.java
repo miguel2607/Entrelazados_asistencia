@@ -39,6 +39,7 @@ public class JwtUtil {
             parseClaims(token);
             return true;
         } catch (JwtException | IllegalArgumentException e) {
+            System.err.println("[JWT Debug] Validation error: " + e.getMessage());
             return false;
         }
     }
