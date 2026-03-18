@@ -1,0 +1,1 @@
+ALTER TABLE asistencia ADD COLUMN jornada VARCHAR(20);
