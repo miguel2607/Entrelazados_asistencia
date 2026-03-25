@@ -50,7 +50,6 @@ export function DashboardPage() {
   // Similar names search state
   const [similarNinos, setSimilarNinos] = useState<{ id: number; nombre: string }[]>([]);
   const [similarAcudientes, setSimilarAcudientes] = useState<{ id: number; nombre: string; telefono?: string; cc?: string }[]>([]);
-  const [searchingSimilar, setSearchingSimilar] = useState(false);
   const searchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const searchSimilarNinos = (nombre: string) => {
@@ -59,11 +58,9 @@ export function DashboardPage() {
       setSimilarNinos([]);
       return;
     }
-    setSearchingSimilar(true);
     searchTimeoutRef.current = setTimeout(() => {
       api.get<{ id: number; nombre: string }[]>('/ninos', { nombre })
-        .then(setSimilarNinos)
-        .finally(() => setSearchingSimilar(false));
+        .then(setSimilarNinos);
     }, 500);
   };
 
@@ -73,11 +70,9 @@ export function DashboardPage() {
       setSimilarAcudientes([]);
       return;
     }
-    setSearchingSimilar(true);
     searchTimeoutRef.current = setTimeout(() => {
       api.get<{ id: number; nombre: string; telefono?: string; cc?: string }[]>('/acudientes', { nombre })
-        .then(setSimilarAcudientes)
-        .finally(() => setSearchingSimilar(false));
+        .then(setSimilarAcudientes);
     }, 500);
   };
 
