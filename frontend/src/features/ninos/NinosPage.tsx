@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { api } from '../../shared/api/apiClient';
 import { Table } from '../../shared/components/Table';
@@ -29,6 +29,33 @@ export function NinosPage() {
   const [editingId, setEditingId] = useState<number | null>(null);
   const [saving, setSaving] = useState(false);
   const [createdNinoId, setCreatedNinoId] = useState<number | null>(null);
+  const [similarNinos, setSimilarNinos] = useState<{ id: number; nombre: string }[]>([]);
+  const [similarAcudientes, setSimilarAcudientes] = useState<{ id: number; nombre: string; telefono?: string; cc?: string }[]>([]);
+  const searchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const searchSimilarNinos = (nombre: string) => {
+    if (searchTimeoutRef.current) clearTimeout(searchTimeoutRef.current);
+    if (!nombre.trim() || nombre.length < 3) {
+      setSimilarNinos([]);
+      return;
+    }
+    searchTimeoutRef.current = setTimeout(() => {
+      api.get<{ id: number; nombre: string }[]>('/ninos', { nombre })
+        .then(setSimilarNinos);
+    }, 500);
+  };
+
+  const searchSimilarAcudientes = (nombre: string) => {
+    if (searchTimeoutRef.current) clearTimeout(searchTimeoutRef.current);
+    if (!nombre.trim() || nombre.length < 3) {
+      setSimilarAcudientes([]);
+      return;
+    }
+    searchTimeoutRef.current = setTimeout(() => {
+      api.get<{ id: number; nombre: string; telefono?: string; cc?: string }[]>('/acudientes', { nombre })
+        .then(setSimilarAcudientes);
+    }, 500);
+  };
 
   // Confirm delete modal
   const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
@@ -49,6 +76,8 @@ export function NinosPage() {
     setStep1({ nombre: '', ti: '', fechaNacimiento: '' });
     setStep2({ nombre: '', cc: '', telefono: '', parentesco: '' });
     setCreatedNinoId(null);
+    setSimilarNinos([]);
+    setSimilarAcudientes([]);
     setError(null);
   };
 
@@ -237,10 +266,29 @@ export function NinosPage() {
               <input
                 required
                 value={step1.nombre}
-                onChange={(e) => setStep1((f) => ({ ...f, nombre: e.target.value }))}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  setStep1((f) => ({ ...f, nombre: val }));
+                  searchSimilarNinos(val);
+                }}
                 className="w-full rounded-xl border border-[#e2e8f0] px-4 py-3 text-sm font-medium focus:border-[#2d1b69] focus:outline-none focus:ring-4 focus:ring-indigo-50 transition-all"
                 placeholder="Ej: Juan Pérez"
               />
+              {similarNinos.length > 0 && (
+                <div className="mt-2 p-3 rounded-xl bg-amber-50 border border-amber-200 animate-fade-in">
+                  <p className="text-[10px] font-extrabold text-amber-700 uppercase tracking-widest mb-2 flex items-center gap-1">
+                    <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
+                    Registros con nombres similares:
+                  </p>
+                  <ul className="space-y-1">
+                    {similarNinos.map(n => (
+                      <li key={n.id} className="text-xs font-bold text-amber-900 border-l-2 border-amber-300 pl-2">
+                        {n.nombre} <span className="text-[10px] font-medium text-amber-600 block">(Ya existe en el sistema)</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-1.5">
@@ -283,10 +331,29 @@ export function NinosPage() {
               <input
                 required
                 value={step2.nombre}
-                onChange={(e) => setStep2((f) => ({ ...f, nombre: e.target.value }))}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  setStep2((f) => ({ ...f, nombre: val }));
+                  searchSimilarAcudientes(val);
+                }}
                 className="w-full rounded-xl border border-[#e2e8f0] px-4 py-3 text-sm font-medium focus:border-[#2d1b69] focus:outline-none focus:ring-4 focus:ring-indigo-50 transition-all"
                 placeholder="Ej: María González"
               />
+              {similarAcudientes.length > 0 && (
+                <div className="mt-2 p-3 rounded-xl bg-amber-50 border border-amber-200 animate-fade-in">
+                  <p className="text-[10px] font-extrabold text-amber-700 uppercase tracking-widest mb-2 flex items-center gap-1">
+                    <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
+                    Acudientes similares:
+                  </p>
+                  <ul className="space-y-1">
+                    {similarAcudientes.map(a => (
+                      <li key={a.id} className="text-xs font-bold text-amber-900 border-l-2 border-amber-300 pl-2">
+                        {a.nombre} {a.telefono && <span className="text-[9px] font-medium text-amber-600 ml-1">({a.telefono})</span>}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-1.5">
