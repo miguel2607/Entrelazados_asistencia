@@ -3,7 +3,7 @@ package com.entrelazados.web;
 import com.entrelazados.domain.Nino;
 import com.entrelazados.domain.NinoPlan;
 import com.entrelazados.domain.Servicio;
-import com.entrelazados.persistence.entity.NinoPlanEntity;
+import com.entrelazados.persistence.entity.NinoPlanCongelacionEntity;
 import com.entrelazados.service.NinoPlanService;
 import com.entrelazados.service.NinoService;
 import com.entrelazados.service.PaqueteService;
@@ -48,7 +48,8 @@ public class NinoPlanController {
     @ResponseStatus(HttpStatus.CREATED)
     public Map<String, Object> asignarPaquete(@RequestParam Integer idNino, @RequestParam Integer idPaquete,
             @Valid @RequestBody NinoPlanRequest request) {
-        NinoPlan p = planService.asignarPaquete(idNino, idPaquete, request.fechaInicio(), request.totalSesiones());
+        NinoPlan p = planService.asignarPaquete(idNino, idPaquete, request.fechaInicio(), request.totalSesiones(),
+                request.cantidad(), request.porcentajeDescuento());
         return toResponse(p);
     }
 
@@ -109,6 +110,17 @@ public class NinoPlanController {
         return toResponse(p);
     }
 
+    @PostMapping("/{id}/congelar")
+    public Map<String, Object> congelar(@PathVariable Integer id, @RequestParam Integer dias) {
+        NinoPlan p = planService.congelarPlan(id, dias);
+        return toResponse(p);
+    }
+
+    @GetMapping("/{id}/congelaciones")
+    public List<NinoPlanCongelacionEntity> getCongelaciones(@PathVariable Integer id) {
+        return planService.findCongelaciones(id);
+    }
+
     private Map<String, Object> toResponse(NinoPlan p) {
         Map<String, Object> m = new HashMap<>();
         m.put("id", p.id());
@@ -120,6 +132,8 @@ public class NinoPlanController {
         m.put("sesionesConsumidas", p.sesionesConsumidas());
         m.put("fechaInicio", p.fechaInicio().toString());
         m.put("fechaFin", p.fechaFin() != null ? p.fechaFin().toString() : null);
+        m.put("precioAcordado", p.precioAcordado());
+        m.put("porcentajeDescuento", p.porcentajeDescuento());
         return m;
     }
 }

@@ -161,12 +161,40 @@ export function AsistenciaPage() {
       })
       .catch((e) => setError(e.message));
   };
+  
+  const eliminarAsistencia = (idAsistencia: number) => {
+    if (!window.confirm('¿Estás seguro de que deseas eliminar este registro de asistencia? Se devolverá la sesión al plan si corresponde.')) return;
+    api.delete('/asistencia/' + idAsistencia)
+      .then(() => {
+        load();
+        if (historialData.length > 0) verHistorial();
+      })
+      .catch((e) => setError(e.message));
+  };
 
   const submitNuevaAsistencia = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!nuevaAsistenciaNinoId) return;
-    const idPlan = nuevaAsistenciaPlanId ? Number(nuevaAsistenciaPlanId) : null;
-    const idServicio = nuevaAsistenciaServicioId ? Number(nuevaAsistenciaServicioId) : null;
+    if (!nuevaAsistenciaNinoId || !nuevaAsistenciaPlanId || (serviciosDePaquete.length > 0 && !nuevaAsistenciaServicioId)) {
+        setError("Debe seleccionar un estudiante, un plan y un servicio.");
+        return;
+    }
+    const idPlan = Number(nuevaAsistenciaPlanId);
+    // Si hay servicios en el paquete, el idServicio es obligatorio. Si es un plan de tipo SERVICIO, el idServicio está implícito en el plan a nivel de backend pero aquí lo necesitamos enviar si aplica.
+    // En el backend, registrarEntrada requiere idServicio.
+    // Si el plan es de tipo SERVICIO, necesitamos obtener el id del servicio asociado.
+    let idServicio = nuevaAsistenciaServicioId ? Number(nuevaAsistenciaServicioId) : null;
+    
+    if (!idServicio) {
+        const plan = planesActivosEnFecha.find(p => p.id === idPlan);
+        if (plan?.tipo === 'SERVICIO') {
+            // Buscamos el detalle para obtener el idServicio
+            api.get<{ idServicio?: number }>(`/planes/${idPlan}`).then(detail => {
+                registrarEntrada(Number(nuevaAsistenciaNinoId), idPlan, detail.idServicio || null, nuevaAsistenciaJornada, '');
+            });
+            return;
+        }
+    }
+
     registrarEntrada(Number(nuevaAsistenciaNinoId), idPlan, idServicio, nuevaAsistenciaJornada, '');
   };
 
@@ -259,7 +287,7 @@ export function AsistenciaPage() {
 
               <button
                 type="submit"
-                disabled={sendingEntrada || !nuevaAsistenciaNinoId || (serviciosDePaquete.length > 0 && !nuevaAsistenciaServicioId)}
+                disabled={sendingEntrada || !nuevaAsistenciaNinoId || !nuevaAsistenciaPlanId || (serviciosDePaquete.length > 0 && !nuevaAsistenciaServicioId)}
                 className="google-button-primary disabled:opacity-50"
               >
                 {sendingEntrada ? 'Procesando...' : 'Registrar Entrada'}
@@ -303,15 +331,26 @@ export function AsistenciaPage() {
                   }`}
                 >
                   {/* Status Indicator */}
-                  {estaEnSala && (
-                    <div className="absolute top-4 right-4 flex items-center gap-2">
-                       <span className="relative flex h-2.5 w-2.5">
-                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                        <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500"></span>
-                      </span>
-                      <span className="text-[10px] font-black text-emerald-600 uppercase tracking-widest">En Sala</span>
-                    </div>
-                  )}
+                  <div className="absolute top-4 right-4 flex items-center gap-2">
+                    <button 
+                      onClick={(e) => { e.stopPropagation(); eliminarAsistencia(a.id); }}
+                      className="p-1.5 text-gray-400 hover:text-rose-500 transition-colors opacity-0 group-hover:opacity-100 mr-2"
+                      title="Eliminar registro"
+                    >
+                      <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                    </button>
+                    {estaEnSala ? (
+                      <>
+                        <span className="relative flex h-2.5 w-2.5">
+                          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                          <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500"></span>
+                        </span>
+                        <span className="text-[10px] font-black text-emerald-600 uppercase tracking-widest">En Sala</span>
+                      </>
+                    ) : (
+                      <span className="text-[9px] font-black text-gray-400 uppercase tracking-widest italic">Finalizado</span>
+                    )}
+                  </div>
 
                   <div className="flex items-center justify-between mb-1">
                     <p className="text-[9px] font-black text-[#9ca3af] uppercase tracking-widest">{a.nombrePlan ?? 'Servicio Individual'}</p>
@@ -433,11 +472,10 @@ export function AsistenciaPage() {
                    <table className="w-full text-left">
                     <thead>
                       <tr className="border-b border-gray-100">
-                        <th className="pb-4 text-[10px] font-black text-[#9ca3af] uppercase tracking-widest">Fecha</th>
-                        <th className="pb-4 text-[10px] font-black text-[#9ca3af] uppercase tracking-widest">Jornada</th>
                         <th className="pb-4 text-[10px] font-black text-[#9ca3af] uppercase tracking-widest">Entrada</th>
                         <th className="pb-4 text-[10px] font-black text-[#9ca3af] uppercase tracking-widest">Salida</th>
                         <th className="pb-4 text-[10px] font-black text-[#9ca3af] uppercase tracking-widest">Observación</th>
+                        <th className="pb-4 text-[10px] font-black text-[#9ca3af] uppercase tracking-widest text-right">Acciones</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-50">
@@ -450,6 +488,15 @@ export function AsistenciaPage() {
                           <td className="py-4 text-sm font-black text-[#2d1b69] font-mono">{r.horaEntrada ?? '--:--'}</td>
                           <td className="py-4 text-sm font-black text-[#2d1b69] font-mono">{r.horaSalida ?? '--:--'}</td>
                           <td className="py-4 text-xs italic text-[#4b5563] max-w-sm truncate">{r.observacion || '-'}</td>
+                          <td className="py-4 text-right">
+                             <button 
+                              onClick={() => eliminarAsistencia(r.id)}
+                              className="p-2 text-gray-400 hover:text-rose-500 transition-colors"
+                              title="Eliminar registro"
+                             >
+                                <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                             </button>
+                          </td>
                         </tr>
                       ))}
                     </tbody>

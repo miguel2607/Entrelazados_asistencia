@@ -33,6 +33,11 @@ public class AsistenciaService {
         if (!ninoService.existePorId(idNino))
             throw new RecursoNoEncontradoException("Niño no encontrado");
 
+        // Validación obligatoria solicitada por el usuario
+        if (idPlan == null || idServicio == null) {
+            throw new ConflictoException("Debe seleccionar un estudiante, un plan asignado y un servicio para registrar la entrada.");
+        }
+
         // Regla: Solo descontar 1 sesión por día para el niño (sin importar jornada)
         boolean yaAsistioHoy = repo.existsByIdNinoAndFecha(idNino, fecha);
 
@@ -109,6 +114,24 @@ public class AsistenciaService {
                 .orElseThrow(() -> new RecursoNoEncontradoException("Asistencia no encontrada"));
         e.setObservacion(observacion != null ? observacion : "");
         return toDomain(repo.save(e));
+    }
+
+    @Transactional
+    public void eliminar(Integer id) {
+        AsistenciaEntity e = repo.findById(id)
+                .orElseThrow(() -> new RecursoNoEncontradoException("Asistencia no encontrada"));
+        
+        // Devolver la sesión si el registro descontó una
+        if (e.getIdPlan() != null) {
+            planRepo.findById(e.getIdPlan()).ifPresent(plan -> {
+                if (plan.getSesionesConsumidas() > 0) {
+                    plan.setSesionesConsumidas(plan.getSesionesConsumidas() - 1);
+                    planRepo.save(plan);
+                }
+            });
+        }
+        
+        repo.delete(e);
     }
 
     private Asistencia toDomain(AsistenciaEntity e) {

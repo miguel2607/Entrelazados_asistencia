@@ -30,6 +30,10 @@ public class NinoPlanEntity {
     private LocalDate fechaFin;
     @Column(name = "ultima_alerta_desestimada_en")
     private java.time.LocalDateTime ultimaAlertaDesestimadaEn;
+    @Column(name = "precio_acordado")
+    private java.math.BigDecimal precioAcordado;
+    @Column(name = "porcentaje_descuento")
+    private java.math.BigDecimal porcentajeDescuento = java.math.BigDecimal.ZERO;
 
     public Integer getId() {
         return id;
@@ -109,5 +113,21 @@ public class NinoPlanEntity {
 
     public void setUltimaAlertaDesestimadaEn(java.time.LocalDateTime ultimaAlertaDesestimadaEn) {
         this.ultimaAlertaDesestimadaEn = ultimaAlertaDesestimadaEn;
+    }
+
+    public java.math.BigDecimal getPrecioAcordado() {
+        return precioAcordado;
+    }
+
+    public void setPrecioAcordado(java.math.BigDecimal precioAcordado) {
+        this.precioAcordado = precioAcordado;
+    }
+
+    public java.math.BigDecimal getPorcentajeDescuento() {
+        return porcentajeDescuento;
+    }
+
+    public void setPorcentajeDescuento(java.math.BigDecimal porcentajeDescuento) {
+        this.porcentajeDescuento = porcentajeDescuento;
     }
 }

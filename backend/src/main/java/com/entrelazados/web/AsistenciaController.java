@@ -94,6 +94,12 @@ public class AsistenciaController {
         return toMap(a);
     }
 
+    @DeleteMapping("/{id}")
+    @ResponseStatus(org.springframework.http.HttpStatus.NO_CONTENT)
+    public void eliminar(@PathVariable Integer id) {
+        asistenciaService.eliminar(id);
+    }
+
     private Map<String, Object> toMap(Asistencia a) {
         Map<String, Object> m = new HashMap<>();
         m.put("id", a.id());

@@ -4,7 +4,8 @@ import java.time.LocalDate;
 
 public record NinoPlan(Integer id, Integer idNino, TipoPlan tipo, Integer idServicio, Integer idPaquete,
         Integer totalSesiones, Integer sesionesConsumidas,
-        LocalDate fechaInicio, LocalDate fechaFin) {
+        LocalDate fechaInicio, LocalDate fechaFin,
+        java.math.BigDecimal precioAcordado, java.math.BigDecimal porcentajeDescuento) {
 
     public boolean estaVigenteEn(LocalDate fecha) {
         if (fecha == null) return false;

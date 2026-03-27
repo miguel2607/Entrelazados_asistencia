@@ -7,5 +7,7 @@ import java.time.LocalDate;
 public record NinoPlanRequest(
         @NotNull LocalDate fechaInicio,
         LocalDate fechaFin,
-        Integer totalSesiones) {
+        Integer totalSesiones,
+        Integer cantidad,
+        java.math.BigDecimal porcentajeDescuento) {
 }

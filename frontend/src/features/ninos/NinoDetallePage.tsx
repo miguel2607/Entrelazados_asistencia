@@ -58,6 +58,7 @@ interface PlanEstado {
   finalizado: boolean;
   fechaTermino?: string;
   motivoTermino?: 'sesiones' | 'tiempo';
+  historialCongelaciones: { id: number; fecha: string; dias: number }[];
 }
 
 export function NinoDetallePage() {
@@ -78,6 +79,9 @@ export function NinoDetallePage() {
   const [selectedPlanId, setSelectedPlanId] = useState<number | null>(null);
   const [sessionsToAdd, setSessionsToAdd] = useState(1);
   const [isSavingSessions, setIsSavingSessions] = useState(false);
+
+  // Congelamiento
+  const [isFreezing, setIsFreezing] = useState<number | null>(null);
 
   const load = () => {
     if (!id) return;
@@ -123,9 +127,18 @@ export function NinoDetallePage() {
         return Promise.all(
           planes.map((plan) => {
             const historyUrl = `/asistencia/historial?idNino=${ninoId}&desde=${plan.fechaInicio}${plan.fechaFin ? `&hasta=${plan.fechaFin}` : ''}`;
-            return api
-              .get<AsistenciaRow[]>(historyUrl)
-              .then((historial) => {
+            return Promise.allSettled([
+              api.get<AsistenciaRow[]>(historyUrl),
+              api.get<{ id: number; fecha: string; dias: number }[]>(`/planes/${plan.id}/congelaciones`)
+            ])
+              .then((results) => {
+                const historial = results[0].status === 'fulfilled' ? results[0].value : [];
+                const congelaciones = results[1].status === 'fulfilled' ? results[1].value : [];
+
+                if (results[1].status === 'rejected') {
+                  console.error(`Error fetching congelaciones for plan ${plan.id}:`, results[1].reason);
+                }
+
                 const diasTotales = plan.totalSesiones;
                 const diasUsados = plan.sesionesConsumidas ?? historial.length;
                 const diasRestantes = Math.max(0, diasTotales - diasUsados);
@@ -169,7 +182,8 @@ export function NinoDetallePage() {
                   montoRestante: diasRestantes * precioPorDia,
                   finalizado,
                   fechaTermino,
-                  motivoTermino
+                  motivoTermino,
+                  historialCongelaciones: congelaciones
                 } as PlanEstado;
               });
           })
@@ -218,6 +232,18 @@ export function NinoDetallePage() {
       alert('Error al añadir sesiones: ' + err.message);
     } finally {
       setIsSavingSessions(false);
+    }
+  };
+
+  const handleCongelar = async (idPlan: number, dias: number) => {
+    setIsFreezing(idPlan);
+    try {
+      await api.post(`/planes/${idPlan}/congelar?dias=${dias}`, {});
+      window.location.reload();
+    } catch (err: any) {
+      alert('Error al congelar: ' + err.message);
+    } finally {
+      setIsFreezing(null);
     }
   };
 
@@ -437,9 +463,50 @@ export function NinoDetallePage() {
                       </div>
                     </div>
                     
+                    <div className="mt-5 grid grid-cols-2 gap-3 pb-4 border-b border-[#f1f3f4]">
+                      <button
+                        onClick={() => handleCongelar(e.id, 7)}
+                        disabled={isFreezing !== null || e.finalizado}
+                        className="flex items-center justify-center gap-2 py-2.5 rounded-xl border border-[#e2e8f0] bg-white text-[9px] font-extrabold text-[#k026d3] uppercase tracking-widest hover:bg-fuchsia-50 hover:border-[#c026d3] transition-all disabled:opacity-50"
+                      >
+                        <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                        </svg>
+                        Congelar 7d
+                      </button>
+                      <button
+                        onClick={() => handleCongelar(e.id, 14)}
+                        disabled={isFreezing !== null || e.finalizado}
+                        className="flex items-center justify-center gap-2 py-2.5 rounded-xl border border-[#e2e8f0] bg-white text-[9px] font-extrabold text-[#k026d3] uppercase tracking-widest hover:bg-fuchsia-50 hover:border-[#c026d3] transition-all disabled:opacity-50"
+                      >
+                        <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                        </svg>
+                        Congelar 14d
+                      </button>
+                    </div>
+
+                    {e.historialCongelaciones?.length > 0 && (
+                      <div className="mt-4 p-4 rounded-2xl bg-fuchsia-50/50 border border-fuchsia-100">
+                        <p className="text-[8px] font-extrabold text-fuchsia-700 uppercase tracking-widest mb-2 flex items-center gap-1">
+                          <svg className="h-2.5 w-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                          Historial de Congelamientos
+                        </p>
+                        <ul className="space-y-1.5">
+                          {e.historialCongelaciones.map(c => (
+                            <li key={c.id} className="flex justify-between items-center text-[9px] font-bold text-fuchsia-900 border-l-2 border-fuchsia-200 pl-2">
+                              <span>{new Date(c.fecha + 'T00:00:00').toLocaleDateString('es-CO', { day: '2-digit', month: '2-digit' })}</span>
+                              <span className="bg-white px-1.5 py-0.5 rounded shadow-sm">+{c.dias} días</span>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+                    
                     <button
                       onClick={() => handleAgregarSesiones(e.id)}
-                      className="mt-4 w-full flex items-center justify-center gap-2 py-2 rounded-xl border border-[#e2e8f0] text-[10px] font-extrabold text-[#2d1b69] uppercase tracking-widest hover:bg-indigo-50 hover:border-[#2d1b69] transition-all"
+                      disabled={e.finalizado}
+                      className="mt-4 w-full flex items-center justify-center gap-2 py-2 rounded-xl border border-[#e2e8f0] text-[10px] font-extrabold text-[#2d1b69] uppercase tracking-widest hover:bg-indigo-50 hover:border-[#2d1b69] transition-all disabled:opacity-50"
                     >
                       <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M12 4v16m8-8H4" />

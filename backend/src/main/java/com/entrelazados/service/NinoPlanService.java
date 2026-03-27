@@ -2,7 +2,9 @@ package com.entrelazados.service;
 
 import com.entrelazados.domain.NinoPlan;
 import com.entrelazados.domain.TipoPlan;
+import com.entrelazados.persistence.entity.NinoPlanCongelacionEntity;
 import com.entrelazados.persistence.entity.NinoPlanEntity;
+import com.entrelazados.persistence.repository.NinoPlanCongelacionJpaRepository;
 import com.entrelazados.persistence.repository.NinoPlanJpaRepository;
 import com.entrelazados.persistence.repository.PaqueteJpaRepository;
 import com.entrelazados.persistence.repository.ServicioJpaRepository;
@@ -20,13 +22,16 @@ public class NinoPlanService {
     private final ServicioJpaRepository servicioRepo;
     private final PaqueteJpaRepository paqueteRepo;
     private final com.entrelazados.service.NinoService ninoService;
+    private final NinoPlanCongelacionJpaRepository congelacionRepo;
 
     public NinoPlanService(NinoPlanJpaRepository repo, ServicioJpaRepository servicioRepo,
-            PaqueteJpaRepository paqueteRepo, com.entrelazados.service.NinoService ninoService) {
+            PaqueteJpaRepository paqueteRepo, com.entrelazados.service.NinoService ninoService,
+            NinoPlanCongelacionJpaRepository congelacionRepo) {
         this.repo = repo;
         this.servicioRepo = servicioRepo;
         this.paqueteRepo = paqueteRepo;
         this.ninoService = ninoService;
+        this.congelacionRepo = congelacionRepo;
     }
 
     @Transactional
@@ -45,25 +50,41 @@ public class NinoPlanService {
         e.setTotalSesiones(dias);
         e.setFechaFin(fechaInicio.plusDays(29)); // Plazo fijo de 30 días
         e.setSesionesConsumidas(0);
+        e.setPrecioAcordado(servicio.getPrecio());
+        e.setPorcentajeDescuento(java.math.BigDecimal.ZERO);
         return toDomain(repo.save(e));
     }
 
     @Transactional
-    public NinoPlan asignarPaquete(Integer idNino, Integer idPaquete, LocalDate fechaInicio, Integer totalSesiones) {
+    public NinoPlan asignarPaquete(Integer idNino, Integer idPaquete, LocalDate fechaInicio, Integer totalSesiones,
+            Integer cantidad, java.math.BigDecimal porcentajeDescuento) {
         if (!ninoService.existePorId(idNino))
             throw new RecursoNoEncontradoException("Niño no encontrado");
         var paquete = paqueteRepo.findById(idPaquete)
                 .orElseThrow(() -> new RecursoNoEncontradoException("Paquete no encontrado"));
-        int dias = (totalSesiones != null && totalSesiones > 0) ? totalSesiones : paquete.getCantidadDias();
+        
+        int cant = (cantidad != null && cantidad > 0) ? cantidad : 1;
+        int sesionesBase = (totalSesiones != null && totalSesiones > 0) ? totalSesiones : paquete.getCantidadDias();
+        int totalAcumulado = sesionesBase * cant;
+        
+        java.math.BigDecimal desc = (porcentajeDescuento != null) ? porcentajeDescuento : java.math.BigDecimal.ZERO;
+        java.math.BigDecimal precioUnitario = paquete.getPrecio();
+        java.math.BigDecimal precioSubtotal = precioUnitario.multiply(java.math.BigDecimal.valueOf(cant));
+        java.math.BigDecimal factorDescuento = java.math.BigDecimal.ONE.subtract(desc.divide(java.math.BigDecimal.valueOf(100), 4, java.math.RoundingMode.HALF_UP));
+        java.math.BigDecimal precioFinal = precioSubtotal.multiply(factorDescuento).setScale(2, java.math.RoundingMode.HALF_UP);
+
         NinoPlanEntity e = new NinoPlanEntity();
         e.setIdNino(idNino);
         e.setTipo(TipoPlan.PAQUETE);
         e.setIdServicio(null);
         e.setIdPaquete(idPaquete);
         e.setFechaInicio(fechaInicio);
-        e.setTotalSesiones(dias);
-        e.setFechaFin(fechaInicio.plusDays(dias - 1));
+        e.setTotalSesiones(totalAcumulado);
+        e.setFechaFin(fechaInicio.plusDays(totalAcumulado - 1));
         e.setSesionesConsumidas(0);
+        e.setPrecioAcordado(precioFinal);
+        e.setPorcentajeDescuento(desc);
+        
         return toDomain(repo.save(e));
     }
 
@@ -126,9 +147,34 @@ public class NinoPlanService {
         return toDomain(repo.save(e));
     }
 
+    @Transactional
+    public NinoPlan congelarPlan(Integer id, Integer dias) {
+        NinoPlanEntity e = repo.findById(id).orElseThrow(() -> new RecursoNoEncontradoException("Plan no encontrado"));
+        
+        // 1. Aumentar sesiones/días
+        int nuevoTotal = e.getTotalSesiones() + dias;
+        e.setTotalSesiones(nuevoTotal);
+        if (e.getFechaInicio() != null) {
+            e.setFechaFin(e.getFechaInicio().plusDays(nuevoTotal - 1));
+        }
+        repo.save(e);
+
+        // 2. Registrar en historial
+        NinoPlanCongelacionEntity c = new NinoPlanCongelacionEntity(id, LocalDate.now(), dias);
+        congelacionRepo.save(c);
+
+        return toDomain(e);
+    }
+
+    @Transactional(readOnly = true)
+    public List<NinoPlanCongelacionEntity> findCongelaciones(Integer idPlan) {
+        return congelacionRepo.findByIdNinoPlanOrderByFechaDesc(idPlan);
+    }
+
     private NinoPlan toDomain(NinoPlanEntity e) {
         return new NinoPlan(e.getId(), e.getIdNino(), e.getTipo(), e.getIdServicio(), e.getIdPaquete(),
                 e.getTotalSesiones(), e.getSesionesConsumidas(),
-                e.getFechaInicio(), e.getFechaFin());
+                e.getFechaInicio(), e.getFechaFin(),
+                e.getPrecioAcordado(), e.getPorcentajeDescuento());
     }
 }

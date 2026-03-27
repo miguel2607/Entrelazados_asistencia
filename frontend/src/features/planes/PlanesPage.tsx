@@ -29,7 +29,9 @@ export function PlanesPage() {
     idServicio: 0,
     idPaquete: 0,
     fechaInicio: new Date().toISOString().split('T')[0],
-    totalSesiones: 1
+    totalSesiones: 1,
+    cantidad: 1,
+    porcentajeDescuento: 0
   });
   
   const [sending, setSending] = useState(false);
@@ -59,7 +61,12 @@ export function PlanesPage() {
     setSending(true);
     setError(null);
     setSuccessMessage(null);
-    const body = { fechaInicio: form.fechaInicio, totalSesiones: form.totalSesiones };
+    const body = { 
+      fechaInicio: form.fechaInicio, 
+      totalSesiones: form.totalSesiones,
+      cantidad: form.cantidad,
+      porcentajeDescuento: form.porcentajeDescuento
+    };
     const q = form.tipo === 'SERVICIO' ? `idNino=${form.idNino}&idServicio=${form.idServicio}` : `idNino=${form.idNino}&idPaquete=${form.idPaquete}`;
     const nombreNino = ninos.find((n) => n.id === form.idNino)?.nombre ?? 'el niño';
     const promise = form.tipo === 'SERVICIO' ? api.post('/planes/servicio?' + q, body) : api.post('/planes/paquete?' + q, body);
@@ -80,16 +87,20 @@ export function PlanesPage() {
   const selectedPaquete = paquetes.find((p) => p.id === form.idPaquete) || null;
   
   const currentItem = form.tipo === 'SERVICIO' ? selectedServicio : selectedPaquete;
-  const precioTotal = currentItem?.precio || 0;
-  const tarifaPorJornadaCalculada = form.totalSesiones > 0 ? precioTotal / form.totalSesiones : precioTotal;
+  const precioUnitario = currentItem?.precio || 0;
+  const subtotal = precioUnitario * (form.tipo === 'PAQUETE' ? form.cantidad : 1);
+  const totalSesionesCalculadas = (currentItem?.cantidadDias || 1) * (form.tipo === 'PAQUETE' ? form.cantidad : 1);
+  const precioTotal = subtotal * (1 - form.porcentajeDescuento / 100);
+  const tarifaPorJornadaCalculada = totalSesionesCalculadas > 0 ? precioTotal / totalSesionesCalculadas : precioTotal;
 
   const fechaFinCalculada = useMemo(() => {
     if (!form.fechaInicio) return null;
     const inicio = new Date(form.fechaInicio + 'T00:00:00');
     const fin = new Date(inicio);
-    fin.setDate(fin.getDate() + 29); // Fijo 30 días
+    const dias = totalSesionesCalculadas;
+    fin.setDate(fin.getDate() + (form.tipo === 'SERVICIO' ? 29 : (dias - 1)));
     return fin;
-  }, [form.fechaInicio]);
+  }, [form.fechaInicio, totalSesionesCalculadas, form.tipo]);
 
   const formatFecha = (date: Date | null) => {
     if (!date) return '—';
@@ -266,22 +277,41 @@ export function PlanesPage() {
                         className="w-full rounded-2xl border-2 border-[#f1f3f4] bg-[#f8f9fa] px-6 py-4 text-sm font-bold focus:border-[#2d1b69] focus:bg-white focus:outline-none transition-all shadow-sm"
                       />
                     </div>
+                    {form.tipo === 'PAQUETE' && (
+                      <div className="space-y-4">
+                        <label className="block text-[11px] font-extrabold text-[#4b5563] uppercase tracking-[0.2em]">Cantidad de Paquetes</label>
+                        <div className="flex items-center gap-4 bg-[#f8f9fa] p-4 rounded-2xl border-2 border-[#f1f3f4]">
+                          <button 
+                            onClick={(e) => { e.preventDefault(); setForm(f => ({ ...f, cantidad: Math.max(1, f.cantidad - 1) }))}}
+                            className="h-10 w-10 flex items-center justify-center rounded-xl bg-white border border-[#e2e8f0] text-[#2d1b69] hover:bg-indigo-50"
+                          >
+                            -
+                          </button>
+                          <span className="flex-1 text-center text-lg font-black text-[#111827]">{form.cantidad}</span>
+                          <button 
+                            onClick={(e) => { e.preventDefault(); setForm(f => ({ ...f, cantidad: f.cantidad + 1 }))}}
+                            className="h-10 w-10 flex items-center justify-center rounded-xl bg-white border border-[#e2e8f0] text-[#2d1b69] hover:bg-indigo-50"
+                          >
+                            +
+                          </button>
+                        </div>
+                      </div>
+                    )}
                     <div className="space-y-4">
-                      <label className="block text-[11px] font-extrabold text-[#4b5563] uppercase tracking-[0.2em]">Cupo de Sesiones</label>
-                      <div className="flex items-center gap-4 bg-[#f8f9fa] p-4 rounded-2xl border-2 border-[#f1f3f4]">
-                        <button 
-                          onClick={(e) => { e.preventDefault(); setForm(f => ({ ...f, totalSesiones: Math.max(1, f.totalSesiones - 1) }))}}
-                          className="h-10 w-10 flex items-center justify-center rounded-xl bg-white border border-[#e2e8f0] text-[#2d1b69] hover:bg-indigo-50"
-                        >
-                          -
-                        </button>
-                        <span className="flex-1 text-center text-lg font-black text-[#111827]">{form.totalSesiones}</span>
-                        <button 
-                          onClick={(e) => { e.preventDefault(); setForm(f => ({ ...f, totalSesiones: f.totalSesiones + 1 }))}}
-                          className="h-10 w-10 flex items-center justify-center rounded-xl bg-white border border-[#e2e8f0] text-[#2d1b69] hover:bg-indigo-50"
-                        >
-                          +
-                        </button>
+                      <label className="block text-[11px] font-extrabold text-[#4b5563] uppercase tracking-[0.2em]">Descuento (%)</label>
+                      <input
+                        type="number"
+                        min="0"
+                        max="100"
+                        value={form.porcentajeDescuento}
+                        onChange={(e) => setForm(f => ({ ...f, porcentajeDescuento: Math.min(100, Math.max(0, Number(e.target.value))) }))}
+                        className="w-full rounded-2xl border-2 border-[#f1f3f4] bg-[#f8f9fa] px-6 py-4 text-sm font-bold focus:border-[#2d1b69] focus:bg-white focus:outline-none transition-all shadow-sm"
+                      />
+                    </div>
+                    <div className="space-y-4">
+                      <label className="block text-[11px] font-extrabold text-[#4b5563] uppercase tracking-[0.2em]">Sesiones Totales</label>
+                      <div className="bg-[#f8f9fa] p-4 rounded-2xl border-2 border-[#f1f3f4] flex items-center justify-center">
+                        <span className="text-lg font-black text-[#111827]">{totalSesionesCalculadas}</span>
                       </div>
                     </div>
                   </div>
@@ -338,8 +368,8 @@ export function PlanesPage() {
 
               <div className="grid grid-cols-2 gap-6 pt-4 border-t border-[#f1f3f4]">
                 <div className="flex flex-col gap-1">
-                  <span className="text-[10px] font-extrabold text-[#9ca3af] uppercase tracking-wider">Sesiones</span>
-                  <span className="text-lg font-black text-[#111827]">{form.totalSesiones}</span>
+                  <span className="text-[10px] font-extrabold text-[#9ca3af] uppercase tracking-wider">Sesiones Totales</span>
+                  <span className="text-lg font-black text-[#111827]">{totalSesionesCalculadas}</span>
                 </div>
                 <div className="flex flex-col gap-1">
                   <span className="text-[11px] font-extrabold text-[#9ca3af] uppercase tracking-wider">Por Jornada</span>
@@ -353,10 +383,12 @@ export function PlanesPage() {
                 <div className="flex justify-between items-end">
                   <div className="flex flex-col">
                     <span className="text-[11px] font-black text-[#2d1b69] uppercase tracking-widest">Inversión Final</span>
-                    <p className="text-[10px] text-[#4b5563] font-medium leading-none mt-1">IVA Incluido</p>
+                    {form.porcentajeDescuento > 0 && (
+                      <p className="text-[10px] text-emerald-600 font-bold leading-none mt-1">Desc. {form.porcentajeDescuento}% aplicado</p>
+                    )}
                   </div>
                   <span className="text-3xl font-black text-[#1a73e8] tracking-tighter">
-                    ${precioTotal.toLocaleString('es-CO')}
+                    ${precioTotal.toLocaleString('es-CO', { maximumFractionDigits: 0 })}
                   </span>
                 </div>
               </div>
