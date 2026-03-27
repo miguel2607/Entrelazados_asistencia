@@ -48,7 +48,7 @@ public class NinoPlanService {
         e.setIdPaquete(null);
         e.setFechaInicio(fechaInicio);
         e.setTotalSesiones(dias);
-        e.setFechaFin(fechaInicio.plusDays(29)); // Plazo fijo de 30 días
+        e.setFechaFin(fechaInicio.plusMonths(1)); // Regla: Un mes calendario
         e.setSesionesConsumidas(0);
         e.setPrecioAcordado(servicio.getPrecio());
         e.setPorcentajeDescuento(java.math.BigDecimal.ZERO);
@@ -57,7 +57,7 @@ public class NinoPlanService {
 
     @Transactional
     public NinoPlan asignarPaquete(Integer idNino, Integer idPaquete, LocalDate fechaInicio, Integer totalSesiones,
-            Integer cantidad, java.math.BigDecimal porcentajeDescuento) {
+            Integer cantidad, java.math.BigDecimal porcentajeDescuento, Integer sesionesConsumidas) {
         if (!ninoService.existePorId(idNino))
             throw new RecursoNoEncontradoException("Niño no encontrado");
         var paquete = paqueteRepo.findById(idPaquete)
@@ -80,8 +80,8 @@ public class NinoPlanService {
         e.setIdPaquete(idPaquete);
         e.setFechaInicio(fechaInicio);
         e.setTotalSesiones(totalAcumulado);
-        e.setFechaFin(fechaInicio.plusDays(totalAcumulado - 1));
-        e.setSesionesConsumidas(0);
+        e.setFechaFin(fechaInicio.plusMonths(1)); // Regla: Un mes calendario
+        e.setSesionesConsumidas(sesionesConsumidas != null ? sesionesConsumidas : 0);
         e.setPrecioAcordado(precioFinal);
         e.setPorcentajeDescuento(desc);
         
@@ -151,11 +151,12 @@ public class NinoPlanService {
     public NinoPlan congelarPlan(Integer id, Integer dias) {
         NinoPlanEntity e = repo.findById(id).orElseThrow(() -> new RecursoNoEncontradoException("Plan no encontrado"));
         
-        // 1. Aumentar sesiones/días
-        int nuevoTotal = e.getTotalSesiones() + dias;
-        e.setTotalSesiones(nuevoTotal);
-        if (e.getFechaInicio() != null) {
-            e.setFechaFin(e.getFechaInicio().plusDays(nuevoTotal - 1));
+        // 1. Aumentar sesiones y extender fecha de fin
+        e.setTotalSesiones(e.getTotalSesiones() + dias);
+        if (e.getFechaFin() != null) {
+            e.setFechaFin(e.getFechaFin().plusDays(dias));
+        } else if (e.getFechaInicio() != null) {
+            e.setFechaFin(e.getFechaInicio().plusDays(29 + dias));
         }
         repo.save(e);
 

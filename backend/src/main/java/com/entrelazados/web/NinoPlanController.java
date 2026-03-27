@@ -49,7 +49,7 @@ public class NinoPlanController {
     public Map<String, Object> asignarPaquete(@RequestParam Integer idNino, @RequestParam Integer idPaquete,
             @Valid @RequestBody NinoPlanRequest request) {
         NinoPlan p = planService.asignarPaquete(idNino, idPaquete, request.fechaInicio(), request.totalSesiones(),
-                request.cantidad(), request.porcentajeDescuento());
+                request.cantidad(), request.porcentajeDescuento(), request.sesionesConsumidas());
         return toResponse(p);
     }
 

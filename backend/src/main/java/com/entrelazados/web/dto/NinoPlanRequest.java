@@ -9,5 +9,6 @@ public record NinoPlanRequest(
         LocalDate fechaFin,
         Integer totalSesiones,
         Integer cantidad,
-        java.math.BigDecimal porcentajeDescuento) {
+        java.math.BigDecimal porcentajeDescuento,
+        Integer sesionesConsumidas) {
 }

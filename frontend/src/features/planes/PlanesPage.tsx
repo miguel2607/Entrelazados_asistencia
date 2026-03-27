@@ -31,7 +31,8 @@ export function PlanesPage() {
     fechaInicio: new Date().toISOString().split('T')[0],
     totalSesiones: 1,
     cantidad: 1,
-    porcentajeDescuento: 0
+    porcentajeDescuento: 0,
+    sesionesConsumidas: 0
   });
   
   const [sending, setSending] = useState(false);
@@ -65,7 +66,8 @@ export function PlanesPage() {
       fechaInicio: form.fechaInicio, 
       totalSesiones: form.totalSesiones,
       cantidad: form.cantidad,
-      porcentajeDescuento: form.porcentajeDescuento
+      porcentajeDescuento: form.porcentajeDescuento,
+      sesionesConsumidas: form.sesionesConsumidas
     };
     const q = form.tipo === 'SERVICIO' ? `idNino=${form.idNino}&idServicio=${form.idServicio}` : `idNino=${form.idNino}&idPaquete=${form.idPaquete}`;
     const nombreNino = ninos.find((n) => n.id === form.idNino)?.nombre ?? 'el niño';
@@ -97,10 +99,9 @@ export function PlanesPage() {
     if (!form.fechaInicio) return null;
     const inicio = new Date(form.fechaInicio + 'T00:00:00');
     const fin = new Date(inicio);
-    const dias = totalSesionesCalculadas;
-    fin.setDate(fin.getDate() + (form.tipo === 'SERVICIO' ? 29 : (dias - 1)));
+    fin.setMonth(fin.getMonth() + 1); // Nueva regla: Mismo día el próximo mes
     return fin;
-  }, [form.fechaInicio, totalSesionesCalculadas, form.tipo]);
+  }, [form.fechaInicio]);
 
   const formatFecha = (date: Date | null) => {
     if (!date) return '—';
@@ -306,6 +307,17 @@ export function PlanesPage() {
                         value={form.porcentajeDescuento}
                         onChange={(e) => setForm(f => ({ ...f, porcentajeDescuento: Math.min(100, Math.max(0, Number(e.target.value))) }))}
                         className="w-full rounded-2xl border-2 border-[#f1f3f4] bg-[#f8f9fa] px-6 py-4 text-sm font-bold focus:border-[#2d1b69] focus:bg-white focus:outline-none transition-all shadow-sm"
+                      />
+                    </div>
+                    <div className="space-y-4">
+                      <label className="block text-[11px] font-extrabold text-[#4b5563] uppercase tracking-[0.2em]">Sesiones Ya Consumidas</label>
+                      <input
+                        type="number"
+                        min="0"
+                        value={form.sesionesConsumidas}
+                        onChange={(e) => setForm(f => ({ ...f, sesionesConsumidas: Math.max(0, Number(e.target.value)) }))}
+                        className="w-full rounded-2xl border-2 border-[#f1f3f4] bg-[#f8f9fa] px-6 py-4 text-sm font-bold focus:border-[#2d1b69] focus:bg-white focus:outline-none transition-all shadow-sm"
+                        placeholder="Ej: 5 si el niño ya asistió antes"
                       />
                     </div>
                     <div className="space-y-4">

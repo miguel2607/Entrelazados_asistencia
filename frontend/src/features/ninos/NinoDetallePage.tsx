@@ -466,7 +466,7 @@ export function NinoDetallePage() {
                     <div className="mt-5 grid grid-cols-2 gap-3 pb-4 border-b border-[#f1f3f4]">
                       <button
                         onClick={() => handleCongelar(e.id, 7)}
-                        disabled={isFreezing !== null || e.finalizado}
+                        disabled={isFreezing !== null}
                         className="flex items-center justify-center gap-2 py-2.5 rounded-xl border border-[#e2e8f0] bg-white text-[9px] font-extrabold text-[#k026d3] uppercase tracking-widest hover:bg-fuchsia-50 hover:border-[#c026d3] transition-all disabled:opacity-50"
                       >
                         <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -476,7 +476,7 @@ export function NinoDetallePage() {
                       </button>
                       <button
                         onClick={() => handleCongelar(e.id, 14)}
-                        disabled={isFreezing !== null || e.finalizado}
+                        disabled={isFreezing !== null}
                         className="flex items-center justify-center gap-2 py-2.5 rounded-xl border border-[#e2e8f0] bg-white text-[9px] font-extrabold text-[#k026d3] uppercase tracking-widest hover:bg-fuchsia-50 hover:border-[#c026d3] transition-all disabled:opacity-50"
                       >
                         <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -505,7 +505,6 @@ export function NinoDetallePage() {
                     
                     <button
                       onClick={() => handleAgregarSesiones(e.id)}
-                      disabled={e.finalizado}
                       className="mt-4 w-full flex items-center justify-center gap-2 py-2 rounded-xl border border-[#e2e8f0] text-[10px] font-extrabold text-[#2d1b69] uppercase tracking-widest hover:bg-indigo-50 hover:border-[#2d1b69] transition-all disabled:opacity-50"
                     >
                       <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
