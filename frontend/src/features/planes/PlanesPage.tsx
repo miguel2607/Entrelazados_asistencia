@@ -99,9 +99,9 @@ export function PlanesPage() {
     if (!form.fechaInicio) return null;
     const inicio = new Date(form.fechaInicio + 'T00:00:00');
     const fin = new Date(inicio);
-    fin.setMonth(fin.getMonth() + 1); // Nueva regla: Mismo día el próximo mes
+    fin.setDate(fin.getDate() + totalSesionesCalculadas);
     return fin;
-  }, [form.fechaInicio]);
+  }, [form.fechaInicio, totalSesionesCalculadas]);
 
   const formatFecha = (date: Date | null) => {
     if (!date) return '—';

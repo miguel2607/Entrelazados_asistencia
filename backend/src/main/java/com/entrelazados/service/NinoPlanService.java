@@ -48,7 +48,7 @@ public class NinoPlanService {
         e.setIdPaquete(null);
         e.setFechaInicio(fechaInicio);
         e.setTotalSesiones(dias);
-        e.setFechaFin(fechaInicio.plusMonths(1)); // Regla: Un mes calendario
+        e.setFechaFin(fechaInicio.plusDays(dias)); 
         e.setSesionesConsumidas(0);
         e.setPrecioAcordado(servicio.getPrecio());
         e.setPorcentajeDescuento(java.math.BigDecimal.ZERO);
@@ -80,7 +80,7 @@ public class NinoPlanService {
         e.setIdPaquete(idPaquete);
         e.setFechaInicio(fechaInicio);
         e.setTotalSesiones(totalAcumulado);
-        e.setFechaFin(fechaInicio.plusMonths(1)); // Regla: Un mes calendario
+        e.setFechaFin(fechaInicio.plusDays(totalAcumulado)); 
         e.setSesionesConsumidas(sesionesConsumidas != null ? sesionesConsumidas : 0);
         e.setPrecioAcordado(precioFinal);
         e.setPorcentajeDescuento(desc);
@@ -151,10 +151,11 @@ public class NinoPlanService {
     public NinoPlan congelarPlan(Integer id, Integer dias) {
         NinoPlanEntity e = repo.findById(id).orElseThrow(() -> new RecursoNoEncontradoException("Plan no encontrado"));
         
-        // 1. Aumentar sesiones y extender fecha de fin
-        e.setTotalSesiones(e.getTotalSesiones() + dias);
+        // 1. Extender fecha de fin sin aumentar sesiones
         if (e.getFechaFin() != null) {
-            e.setFechaFin(e.getFechaFin().plusDays(dias));
+            // Si el plan ya venció, sumamos los días desde hoy. Si no, desde la fecha de fin actual.
+            LocalDate baseDate = e.getFechaFin().isBefore(LocalDate.now()) ? LocalDate.now() : e.getFechaFin();
+            e.setFechaFin(baseDate.plusDays(dias));
         } else if (e.getFechaInicio() != null) {
             e.setFechaFin(e.getFechaInicio().plusDays(29 + dias));
         }
