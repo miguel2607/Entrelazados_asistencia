@@ -53,7 +53,7 @@ public class BiometricController {
                 body = new String(bytes, StandardCharsets.UTF_8);
             }
             
-            log.info("Longitud del body detectado: {} caracteres", body != null ? body.length() : 0);
+            log.debug("Longitud del body detectado: {} caracteres", body != null ? body.length() : 0);
         } catch (Exception e) {
             log.warn("No se pudo leer el cuerpo del evento biométrico: {}", e.getMessage());
             return ResponseEntity.ok().build();
@@ -73,26 +73,12 @@ public class BiometricController {
         log.info("EVENTO RECIBIDO DEL EQUIPO: {}", body);
 
         try {
-            if (body.contains("employeeNoString")) {
-                java.util.regex.Matcher mJson = java.util.regex.Pattern.compile("\"employeeNoString\"\\s*:\\s*\"([^\"]+)\"").matcher(body);
-                java.util.regex.Matcher mXml = java.util.regex.Pattern.compile("<employeeNoString>([^<]+)</employeeNoString>").matcher(body);
-                
-                String employeeId = null;
-                if (mJson.find()) {
-                    employeeId = mJson.group(1).trim();
-                    log.info("ID biométrico detectado (JSON): {}", employeeId);
-                } else if (mXml.find()) {
-                    employeeId = mXml.group(1).trim();
-                    log.info("ID biométrico detectado (XML): {}", employeeId);
-                }
-                
-                if (employeeId != null) {
-                    asistenciaService.registrarAsistenciaBiometrica(employeeId);
-                } else {
-                    log.warn("El evento contiene employeeNoString pero el formato no pudo ser parseado: {}", body);
-                }
+            String employeeId = extraerEmployeeId(body);
+            if (employeeId != null && !employeeId.isBlank()) {
+                log.info("ID biométrico detectado: {}", employeeId);
+                asistenciaService.registrarAsistenciaBiometrica(employeeId);
             } else {
-                log.warn("Evento recibido con formato desconocido (sin employeeNoString): {}", body);
+                log.debug("Evento sin employeeNoString/employeeNo, se ignora.");
             }
         } catch (Exception e) {
             log.error("Error al procesar el evento biométrico: {}", e.getMessage());
@@ -105,5 +91,27 @@ public class BiometricController {
         java.util.regex.Pattern json = java.util.regex.Pattern.compile("\"eventType\"\\s*:\\s*\"heartBeat\"", java.util.regex.Pattern.CASE_INSENSITIVE);
         java.util.regex.Pattern xml = java.util.regex.Pattern.compile("<eventType>heartBeat</eventType>", java.util.regex.Pattern.CASE_INSENSITIVE);
         return json.matcher(body).find() || xml.matcher(body).find();
+    }
+
+    /**
+     * Compatibilidad con distintos firmwares Hikvision:
+     * - employeeNoString (JSON/XML)
+     * - employeeNo (JSON/XML)
+     */
+    private String extraerEmployeeId(String body) {
+        java.util.regex.Pattern[] patrones = new java.util.regex.Pattern[] {
+                java.util.regex.Pattern.compile("\"employeeNoString\"\\s*:\\s*\"([^\"]+)\""),
+                java.util.regex.Pattern.compile("\"employeeNo\"\\s*:\\s*\"([^\"]+)\""),
+                java.util.regex.Pattern.compile("\"employeeNo\"\\s*:\\s*(\\d+)"),
+                java.util.regex.Pattern.compile("<employeeNoString>([^<]+)</employeeNoString>", java.util.regex.Pattern.CASE_INSENSITIVE),
+                java.util.regex.Pattern.compile("<employeeNo>([^<]+)</employeeNo>", java.util.regex.Pattern.CASE_INSENSITIVE)
+        };
+        for (java.util.regex.Pattern p : patrones) {
+            java.util.regex.Matcher m = p.matcher(body);
+            if (m.find()) {
+                return m.group(1).trim();
+            }
+        }
+        return null;
     }
 }
