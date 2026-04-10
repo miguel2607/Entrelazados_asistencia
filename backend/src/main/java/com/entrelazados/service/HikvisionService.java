@@ -39,6 +39,9 @@ public class HikvisionService {
     @Value("${hikvision.attendanceCheckOnly:true}")
     private boolean attendanceCheckOnly;
 
+    @Value("${hikvision.syncEnabled:true}")
+    private boolean syncEnabled;
+
     private RestTemplate restTemplate;
 
 @PostConstruct
@@ -84,6 +87,10 @@ public class HikvisionService {
      */
     public void sincronizarNino(NinoEntity nino) {
         if (nino.getBiometricId() == null || nino.getBiometricId().isEmpty()) {
+            return;
+        }
+        if (!syncEnabled) {
+            log.debug("Sincronización Hikvision desactivada (hikvision.syncEnabled=false); no se llama al equipo.");
             return;
         }
 
@@ -218,6 +225,10 @@ public class HikvisionService {
     public void eliminarNino(String biometricId) {
         if (biometricId == null || biometricId.isEmpty())
             return;
+        if (!syncEnabled) {
+            log.debug("Sincronización Hikvision desactivada; no se elimina usuario en el equipo.");
+            return;
+        }
 
         try {
             String url = String.format("http://%s/ISAPI/AccessControl/UserInfo/Delete?format=json", deviceIp);

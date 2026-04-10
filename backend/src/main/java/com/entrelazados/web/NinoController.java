@@ -7,6 +7,7 @@ import com.entrelazados.persistence.entity.NinoAcudienteEntity;
 import com.entrelazados.service.AcudienteService;
 import com.entrelazados.service.AsistenciaService;
 import com.entrelazados.service.HikvisionService;
+import org.springframework.beans.factory.annotation.Value;
 import com.entrelazados.service.NinoAcudienteService;
 import com.entrelazados.service.NinoPlanService;
 import com.entrelazados.service.NinoService;
@@ -31,6 +32,9 @@ public class NinoController {
     private final NinoPlanService ninoPlanService;
     private final AsistenciaService asistenciaService;
     private final HikvisionService hikvisionService;
+
+    @Value("${hikvision.syncEnabled:true}")
+    private boolean hikvisionSyncEnabled;
 
     public NinoController(NinoService ninoService, AcudienteService acudienteService, NinoAcudienteService ninoAcudienteService, NinoPlanService ninoPlanService, AsistenciaService asistenciaService, HikvisionService hikvisionService) {
         this.ninoService = ninoService;
@@ -114,6 +118,10 @@ public class NinoController {
      */
     @PostMapping("/{id}/sincronizar")
     public Map<String, String> sincronizarConDispositivo(@PathVariable Integer id) {
+        if (!hikvisionSyncEnabled) {
+            return Map.of("mensaje",
+                    "La sincronización con el equipo Hikvision está desactivada en este entorno (solo asistencia por eventos).");
+        }
         com.entrelazados.persistence.entity.NinoEntity entity =
                 ninoService.buscarEntidadPorId(id);
         hikvisionService.sincronizarNino(entity);

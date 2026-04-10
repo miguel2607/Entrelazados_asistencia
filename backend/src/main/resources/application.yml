@@ -48,3 +48,5 @@ hikvision:
   username: ${HIKVISION_USER:admin}
   password: ${HIKVISION_PASS:Entrelazados2026}
   attendanceCheckOnly: ${HIKVISION_ATTENDANCE_CHECK_ONLY:true}
+  # En Render (nube) no hay acceso a IPs LAN; desactivar sync y gestionar usuarios/cara en el equipo.
+  syncEnabled: ${HIKVISION_SYNC_ENABLED:true}
