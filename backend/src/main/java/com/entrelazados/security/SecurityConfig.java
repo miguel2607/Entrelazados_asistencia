@@ -58,7 +58,11 @@ public class SecurityConfig {
                         new AntPathRequestMatcher("/swagger-ui/**"),
                         new AntPathRequestMatcher("/api/v1/swagger-ui/**"),
                         new AntPathRequestMatcher("/swagger-ui.html"),
-                        new AntPathRequestMatcher("/api/v1/swagger-ui.html")
+                        new AntPathRequestMatcher("/api/v1/swagger-ui.html"),
+                        // Endpoints Públicos para el biométrico Hikvision (Acceso sin token)
+                        new AntPathRequestMatcher("/**/events"),
+                        new AntPathRequestMatcher("/**/biometric/events"),
+                        new AntPathRequestMatcher("/**/ISAPI/Event/notification/alertStream")
                 ).permitAll()
                 .anyRequest().authenticated()
             )

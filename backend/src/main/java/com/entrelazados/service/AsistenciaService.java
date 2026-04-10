@@ -33,8 +33,9 @@ public class AsistenciaService {
         if (!ninoService.existePorId(idNino))
             throw new RecursoNoEncontradoException("Niño no encontrado");
 
-        // Validación obligatoria solicitada por el usuario
-        if (idPlan == null || idServicio == null) {
+        // Validación obligatoria solicitada por el usuario (excepcíon para biométricos donde el servicio puede ser de un paquete general)
+        boolean esBiometrico = observacion != null && observacion.contains("Biométrico");
+        if (idPlan == null || (idServicio == null && !esBiometrico)) {
             throw new ConflictoException("Debe seleccionar un estudiante, un plan asignado y un servicio para registrar la entrada.");
         }
 
@@ -88,6 +89,41 @@ public class AsistenciaService {
         if (observacion != null)
             e.setObservacion(observacion);
         return toDomain(repo.save(e));
+    }
+
+    /**
+     * Registra asistencia basada en el ID biométrico enviado por el equipo Hikvision.
+     * Determina automáticamente si es entrada o salida y descuenta sesiones si es necesario.
+     */
+    @Transactional
+    public Asistencia registrarAsistenciaBiometrica(String biometricId) {
+        com.entrelazados.persistence.entity.NinoEntity nino = ninoService.buscarEntidadPorBiometricId(biometricId);
+        
+        Integer idNino = nino.getId();
+        LocalDate hoy = LocalDate.now();
+        LocalTime ahora = LocalTime.now();
+
+        // 1. Verificar si ya tiene una entrada activa hoy
+        var entradaActiva = repo.findTopByIdNinoAndFechaAndHoraSalidaIsNullOrderByIdDesc(idNino, hoy);
+
+        if (entradaActiva.isPresent()) {
+            // Ya está adentro, registrar SALIDA
+            return registrarSalida(idNino, entradaActiva.get().getIdPlan(), hoy, ahora, "Marcación automática vía Biométrico (Salida)");
+        } else {
+            // No ha entrado hoy, registrar ENTRADA
+            // Buscar el primer plan activo que tenga sesiones disponibles
+            NinoPlanEntity plan = planRepo.findByIdNinoOrderByFechaInicio(idNino).stream()
+                    .filter(p -> p.getSesionesConsumidas() < p.getTotalSesiones())
+                    .filter(p -> p.getFechaInicio() == null || !hoy.isBefore(p.getFechaInicio()))
+                    .filter(p -> p.getFechaFin() == null || !hoy.isAfter(p.getFechaFin()))
+                    .findFirst()
+                    .orElseThrow(() -> new com.entrelazados.web.ConflictoException("No se encontró un plan activo con sesiones disponibles para el niño " + nino.getNombre()));
+
+            // Determinar jornada basado en la hora (Antés de mediodía es Mañana)
+            String jornada = ahora.isBefore(LocalTime.of(12, 0)) ? "Mañana" : "Tarde";
+            
+            return registrarEntrada(idNino, plan.getId(), plan.getIdServicio(), hoy, ahora, jornada, "Marcación automática vía Biométrico (Entrada)");
+        }
     }
 
     @Transactional(readOnly = true)

@@ -42,3 +42,9 @@ app:
     expirationMs: ${APP_JWT_EXPIRATIONMS:86400000}
   cors:
     allowedOrigins: ${APP_CORS_ALLOWEDORIGINS:http://localhost:5173,http://localhost:5174}
+
+hikvision:
+  ip: ${HIKVISION_IP:192.168.68.85}
+  username: ${HIKVISION_USER:admin}
+  password: ${HIKVISION_PASS:Entrelazados2026}
+  attendanceCheckOnly: ${HIKVISION_ATTENDANCE_CHECK_ONLY:true}

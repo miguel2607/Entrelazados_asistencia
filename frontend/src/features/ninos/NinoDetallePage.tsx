@@ -8,6 +8,7 @@ interface NinoDetalle {
   nombre: string;
   ti: string;
   fechaNacimiento: string;
+  biometricId?: string;
   acudientes: { id: number; nombre: string; telefono: string; parentesco: string }[];
   planesActivos: { tipo: string; nombre: string; servicios: { nombre: string }[] }[];
   asistenciaHoy: { horaEntrada: string; horaSalida: string } | null;
@@ -332,6 +333,10 @@ export function NinoDetallePage() {
               <div className="p-4 rounded-2xl bg-[#fcfaff] border border-[#f3e8ff]">
                 <p className="text-[9px] text-[#2d1b69] font-extrabold uppercase tracking-widest mb-1">F. de Nacimiento</p>
                 <p className="text-sm font-bold text-[#111827] font-mono">{data.fechaNacimiento}</p>
+              </div>
+              <div className="p-4 rounded-2xl bg-[#fcfaff] border border-[#f3e8ff]">
+                <p className="text-[9px] text-[#2d1b69] font-extrabold uppercase tracking-widest mb-1">ID Biométrico</p>
+                <p className="text-sm font-bold text-[#111827] font-mono">{data.biometricId || 'No asignado'}</p>
               </div>
             </div>
           </div>

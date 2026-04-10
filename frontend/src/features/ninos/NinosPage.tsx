@@ -10,10 +10,11 @@ interface Nino {
   nombre: string;
   ti: string;
   fechaNacimiento: string;
+  biometricId?: string;
 }
 
 // Wizard state types
-type Step1Form = { nombre: string; ti: string; fechaNacimiento: string };
+type Step1Form = { nombre: string; ti: string; fechaNacimiento: string; biometricId: string };
 type Step2Form = { nombre: string; cc: string; telefono: string; parentesco: string };
 type WizardStep = 1 | 2;
 
@@ -24,10 +25,11 @@ export function NinosPage() {
   const [buscar, setBuscar] = useState('');
   const [modalOpen, setModalOpen] = useState(false);
   const [step, setStep] = useState<WizardStep>(1);
-  const [step1, setStep1] = useState<Step1Form>({ nombre: '', ti: '', fechaNacimiento: '' });
+  const [step1, setStep1] = useState<Step1Form>({ nombre: '', ti: '', fechaNacimiento: '', biometricId: '' });
   const [step2, setStep2] = useState<Step2Form>({ nombre: '', cc: '', telefono: '', parentesco: '' });
   const [editingId, setEditingId] = useState<number | null>(null);
   const [saving, setSaving] = useState(false);
+  const [suggestingBiometricId, setSuggestingBiometricId] = useState(false);
   const [createdNinoId, setCreatedNinoId] = useState<number | null>(null);
   const [similarNinos, setSimilarNinos] = useState<{ id: number; nombre: string }[]>([]);
   const [similarAcudientes, setSimilarAcudientes] = useState<{ id: number; nombre: string; telefono?: string; cc?: string }[]>([]);
@@ -73,7 +75,7 @@ export function NinosPage() {
 
   const resetWizard = () => {
     setStep(1);
-    setStep1({ nombre: '', ti: '', fechaNacimiento: '' });
+    setStep1({ nombre: '', ti: '', fechaNacimiento: '', biometricId: '' });
     setStep2({ nombre: '', cc: '', telefono: '', parentesco: '' });
     setCreatedNinoId(null);
     setSimilarNinos([]);
@@ -81,15 +83,47 @@ export function NinosPage() {
     setError(null);
   };
 
+  const calcularSiguienteBiometricId = (ninos: Nino[]): string => {
+    const usados = new Set(
+      ninos
+        .map((n) => Number.parseInt((n.biometricId ?? '').trim(), 10))
+        .filter((id) => Number.isInteger(id) && id > 0)
+    );
+    // Reservamos el ID 1 para el admin del equipo Hikvision.
+    let candidato = 2;
+    while (usados.has(candidato)) candidato += 1;
+    return String(candidato);
+  };
+
+  const autocompletarBiometricId = async () => {
+    if (editingId) return;
+    setSuggestingBiometricId(true);
+    try {
+      const todos = await api.get<Nino[]>('/ninos');
+      const sugerido = calcularSiguienteBiometricId(todos);
+      setStep1((prev) => (prev.biometricId ? prev : { ...prev, biometricId: sugerido }));
+    } catch {
+      // Si falla la sugerencia, el usuario aún puede escribir el ID manualmente.
+    } finally {
+      setSuggestingBiometricId(false);
+    }
+  };
+
   const openCreate = () => {
     setEditingId(null);
     resetWizard();
     setModalOpen(true);
+    autocompletarBiometricId();
   };
 
   const openEdit = (n: Nino) => {
     setEditingId(n.id);
-    setStep1({ nombre: n.nombre, ti: n.ti ?? '', fechaNacimiento: n.fechaNacimiento?.slice(0, 10) ?? '' });
+    setStep1({ 
+      nombre: n.nombre, 
+      ti: n.ti ?? '', 
+      fechaNacimiento: n.fechaNacimiento?.slice(0, 10) ?? '',
+      biometricId: n.biometricId ?? ''
+    });
     setStep2({ nombre: '', cc: '', telefono: '', parentesco: '' });
     setStep(1);
     setModalOpen(true);
@@ -107,7 +141,12 @@ export function NinosPage() {
     setSaving(true);
     setError(null);
     try {
-      const body = { nombre: step1.nombre, ti: step1.ti || undefined, fechaNacimiento: step1.fechaNacimiento };
+      const body = { 
+        nombre: step1.nombre, 
+        ti: step1.ti || undefined, 
+        fechaNacimiento: step1.fechaNacimiento,
+        biometricId: step1.biometricId || undefined
+      };
       if (editingId) {
         await api.put<Nino>(`/ninos/${editingId}`, body);
         closeModal();
@@ -310,6 +349,21 @@ export function NinosPage() {
                   className="w-full rounded-xl border border-[#e2e8f0] px-4 py-3 text-sm font-medium focus:border-[#2d1b69] focus:outline-none focus:ring-4 focus:ring-indigo-50 transition-all"
                 />
               </div>
+            </div>
+            {/* Campo ID Biométrico */}
+            <div className="space-y-1.5">
+              <label className="block text-[11px] font-extrabold text-[#4b5563] uppercase tracking-widest">ID Biométrico (Equipo Hikvision)</label>
+              <input
+                value={step1.biometricId}
+                onChange={(e) => setStep1((f) => ({ ...f, biometricId: e.target.value }))}
+                className="w-full rounded-xl border border-[#e2e8f0] px-4 py-3 text-sm font-medium focus:border-[#2d1b69] focus:outline-none focus:ring-4 focus:ring-indigo-50 transition-all"
+                placeholder={suggestingBiometricId ? 'Buscando ID disponible...' : 'Ej: 105'}
+              />
+              <p className="text-[10px] text-[#6b7280]">
+                {suggestingBiometricId
+                  ? 'Calculando siguiente ID biométrico disponible...'
+                  : 'Este ID se sugiere automáticamente según los ya registrados, y debe coincidir con el asignado físicamente en el equipo.'}
+              </p>
             </div>
             <div className="flex justify-end gap-3 pt-6 border-t border-[#e2e8f0]">
               <button type="button" onClick={closeModal} className="google-button-secondary">Cancelar</button>

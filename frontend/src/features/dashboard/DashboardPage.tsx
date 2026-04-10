@@ -23,7 +23,8 @@ type DashboardResponse = {
   alertasPlanes: AlertaPlan[];
 };
 
-type Step1Form = { nombre: string; ti: string; fechaNacimiento: string };
+type NinoResumen = { id: number; nombre: string; biometricId?: string };
+type Step1Form = { nombre: string; ti: string; fechaNacimiento: string; biometricId: string };
 type Step2Form = { nombre: string; cc: string; telefono: string; parentesco: string };
 
 const LIVE_POLL_INTERVAL = 10000; // 10 seconds
@@ -41,9 +42,10 @@ export function DashboardPage() {
   // Wizard añadir niño
   const [wizardOpen, setWizardOpen] = useState(false);
   const [wizardStep, setWizardStep] = useState<1 | 2>(1);
-  const [step1, setStep1] = useState<Step1Form>({ nombre: '', ti: '', fechaNacimiento: '' });
+  const [step1, setStep1] = useState<Step1Form>({ nombre: '', ti: '', fechaNacimiento: '', biometricId: '' });
   const [step2, setStep2] = useState<Step2Form>({ nombre: '', cc: '', telefono: '', parentesco: '' });
   const [wizardSaving, setWizardSaving] = useState(false);
+  const [suggestingBiometricId, setSuggestingBiometricId] = useState(false);
   const [wizardError, setWizardError] = useState<string | null>(null);
   const [createdNinoId, setCreatedNinoId] = useState<number | null>(null);
 
@@ -76,15 +78,40 @@ export function DashboardPage() {
     }, 500);
   };
 
+  const calcularSiguienteBiometricId = (ninos: NinoResumen[]): string => {
+    const usados = new Set(
+      ninos
+        .map((n) => Number.parseInt((n.biometricId ?? '').trim(), 10))
+        .filter((id) => Number.isInteger(id) && id > 0)
+    );
+    let candidato = 2;
+    while (usados.has(candidato)) candidato += 1;
+    return String(candidato);
+  };
+
+  const autocompletarBiometricId = async () => {
+    setSuggestingBiometricId(true);
+    try {
+      const ninos = await api.get<NinoResumen[]>('/ninos');
+      const sugerido = calcularSiguienteBiometricId(ninos);
+      setStep1((prev) => (prev.biometricId ? prev : { ...prev, biometricId: sugerido }));
+    } catch {
+      // Si falla la sugerencia, el campo sigue editable manualmente.
+    } finally {
+      setSuggestingBiometricId(false);
+    }
+  };
+
   const openWizard = () => {
     setWizardStep(1);
-    setStep1({ nombre: '', ti: '', fechaNacimiento: '' });
+    setStep1({ nombre: '', ti: '', fechaNacimiento: '', biometricId: '' });
     setStep2({ nombre: '', cc: '', telefono: '', parentesco: '' });
     setWizardError(null);
     setCreatedNinoId(null);
     setSimilarNinos([]);
     setSimilarAcudientes([]);
     setWizardOpen(true);
+    autocompletarBiometricId();
   };
 
   const closeWizard = () => { setWizardOpen(false); };
@@ -98,6 +125,7 @@ export function DashboardPage() {
         nombre: step1.nombre,
         ti: step1.ti || undefined,
         fechaNacimiento: step1.fechaNacimiento,
+        biometricId: step1.biometricId || undefined,
       });
       setCreatedNinoId(nino.id);
       setWizardStep(2);
@@ -481,6 +509,20 @@ export function DashboardPage() {
                   className="w-full rounded-xl border border-[#e2e8f0] px-4 py-3 text-sm font-medium focus:border-[#2d1b69] focus:outline-none focus:ring-4 focus:ring-indigo-50 transition-all"
                 />
               </div>
+            </div>
+            <div className="space-y-1.5">
+              <label className="block text-[11px] font-extrabold text-[#4b5563] uppercase tracking-widest">ID Biométrico (Equipo Hikvision)</label>
+              <input
+                value={step1.biometricId}
+                onChange={(e) => setStep1((f) => ({ ...f, biometricId: e.target.value }))}
+                className="w-full rounded-xl border border-[#e2e8f0] px-4 py-3 text-sm font-medium focus:border-[#2d1b69] focus:outline-none focus:ring-4 focus:ring-indigo-50 transition-all"
+                placeholder={suggestingBiometricId ? 'Buscando ID disponible...' : 'Ej: 105'}
+              />
+              <p className="text-[10px] text-[#6b7280]">
+                {suggestingBiometricId
+                  ? 'Calculando siguiente ID biométrico disponible...'
+                  : 'Se sugiere automáticamente y puedes modificarlo si lo necesitas.'}
+              </p>
             </div>
             <div className="flex justify-end gap-3 pt-4 border-t border-[#e2e8f0]">
               <button type="button" onClick={closeWizard} className="google-button-secondary">Cancelar</button>

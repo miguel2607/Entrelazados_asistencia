@@ -6,6 +6,7 @@ import com.entrelazados.domain.Nino;
 import com.entrelazados.persistence.entity.NinoAcudienteEntity;
 import com.entrelazados.service.AcudienteService;
 import com.entrelazados.service.AsistenciaService;
+import com.entrelazados.service.HikvisionService;
 import com.entrelazados.service.NinoAcudienteService;
 import com.entrelazados.service.NinoPlanService;
 import com.entrelazados.service.NinoService;
@@ -29,13 +30,15 @@ public class NinoController {
     private final NinoAcudienteService ninoAcudienteService;
     private final NinoPlanService ninoPlanService;
     private final AsistenciaService asistenciaService;
+    private final HikvisionService hikvisionService;
 
-    public NinoController(NinoService ninoService, AcudienteService acudienteService, NinoAcudienteService ninoAcudienteService, NinoPlanService ninoPlanService, AsistenciaService asistenciaService) {
+    public NinoController(NinoService ninoService, AcudienteService acudienteService, NinoAcudienteService ninoAcudienteService, NinoPlanService ninoPlanService, AsistenciaService asistenciaService, HikvisionService hikvisionService) {
         this.ninoService = ninoService;
         this.acudienteService = acudienteService;
         this.ninoAcudienteService = ninoAcudienteService;
         this.ninoPlanService = ninoPlanService;
         this.asistenciaService = asistenciaService;
+        this.hikvisionService = hikvisionService;
     }
 
     @GetMapping
@@ -80,6 +83,7 @@ public class NinoController {
         map.put("nombre", nino.nombre());
         map.put("ti", nino.ti());
         map.put("fechaNacimiento", nino.fechaNacimiento().toString());
+        map.put("biometricId", nino.biometricId());
         map.put("acudientes", acudientes);
         map.put("planesActivos", planesActivos);
         map.put("asistenciaHoy", asistenciaHoy);
@@ -89,17 +93,30 @@ public class NinoController {
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
     public Nino crear(@Valid @RequestBody NinoRequest request) {
-        return ninoService.crear(request.nombre(), request.ti(), request.fechaNacimiento());
+        return ninoService.crear(request.nombre(), request.ti(), request.fechaNacimiento(), request.biometricId());
     }
 
     @PutMapping("/{id}")
     public Nino actualizar(@PathVariable Integer id, @Valid @RequestBody NinoRequest request) {
-        return ninoService.actualizar(id, request.nombre(), request.ti(), request.fechaNacimiento());
+        return ninoService.actualizar(id, request.nombre(), request.ti(), request.fechaNacimiento(), request.biometricId());
     }
 
     @DeleteMapping("/{id}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void eliminar(@PathVariable Integer id) {
         ninoService.eliminar(id);
+    }
+
+    /**
+     * Re-sincroniza un niño con el equipo Hikvision.
+     * Útil para niños que fueron registrados antes de que se implementara
+     * la asignación de permisos y aparecen como "Person Not Assigned with Permission".
+     */
+    @PostMapping("/{id}/sincronizar")
+    public Map<String, String> sincronizarConDispositivo(@PathVariable Integer id) {
+        com.entrelazados.persistence.entity.NinoEntity entity =
+                ninoService.buscarEntidadPorId(id);
+        hikvisionService.sincronizarNino(entity);
+        return Map.of("mensaje", "Re-sincronización enviada al dispositivo para: " + entity.getNombre());
     }
 }

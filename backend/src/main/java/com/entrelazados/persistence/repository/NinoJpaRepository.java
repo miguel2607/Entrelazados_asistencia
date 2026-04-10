@@ -10,4 +10,6 @@ public interface NinoJpaRepository extends JpaRepository<NinoEntity, Integer> {
     List<NinoEntity> findByNombreContainingIgnoreCaseOrderByNombre(String nombre);
 
     List<NinoEntity> findAllByOrderByNombreAsc();
+
+    java.util.Optional<NinoEntity> findByBiometricId(String biometricId);
 }

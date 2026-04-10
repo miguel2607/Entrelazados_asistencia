@@ -45,7 +45,7 @@ public class JwtAuthFilter extends OncePerRequestFilter {
                 System.out.println("[JWT Debug] Token validation FAILED for path: " + path);
             }
         } else {
-            if (!path.contains("/auth/") && !path.contains("/health")) {
+            if (!path.contains("/auth/") && !path.contains("/health") && !path.contains("/events") && !path.contains("/ISAPI/")) {
                 System.out.println("[JWT Debug] No Authorization header found for path: " + path);
             }
         }
