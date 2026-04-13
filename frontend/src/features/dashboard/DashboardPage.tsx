@@ -21,6 +21,7 @@ type DashboardResponse = {
   asistenciaHoy: { id: number; idNino: number; nino: { nombre: string } }[];
   planesActivosHoy: { idNino?: number; nombreNino?: string; tipo: string; nombre: string; sesionesRestantes: number; servicios: { nombre: string }[] }[];
   alertasPlanes: AlertaPlan[];
+  cumpleanosHoy: { id: number; nombre: string; fechaNacimiento: string; edadCumplida: number; mensaje: string }[];
 };
 
 type NinoResumen = { id: number; nombre: string; biometricId?: string };
@@ -434,6 +435,44 @@ export function DashboardPage() {
                     <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" /></svg>
                   </button>
                 </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {(data.cumpleanosHoy?.length ?? 0) > 0 && (
+        <div className="rounded-2xl border border-amber-100 bg-amber-50/60 p-6 shadow-sm animate-scale-in">
+          <div className="flex items-center gap-3 mb-6">
+            <div className="h-8 w-8 rounded-lg bg-amber-100 flex items-center justify-center text-amber-600">
+              <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v5m0 0l3-3m-3 3l-3-3m0 9h6a2 2 0 002-2v-5a2 2 0 00-2-2h-1l-1-2h-4l-1 2H7a2 2 0 00-2 2v5a2 2 0 002 2z" />
+              </svg>
+            </div>
+            <h3 className="text-sm font-bold text-amber-800 uppercase tracking-widest">
+              Cumpleaños de Hoy
+            </h3>
+          </div>
+          <div className="space-y-3">
+            {data.cumpleanosHoy.map((c, idx) => (
+              <div
+                key={c.id}
+                className={`flex flex-wrap items-center justify-between gap-4 rounded-xl bg-white border border-amber-100 px-5 py-4 shadow-sm hover:border-amber-300 transition-colors animate-slide-in-right stagger-${(idx % 5) + 1}`}
+              >
+                <div className="flex items-center gap-4">
+                  <div className="h-8 w-8 rounded-full bg-amber-50 flex items-center justify-center text-amber-600 font-bold text-xs ring-2 ring-white">
+                    {c.nombre.charAt(0)}
+                  </div>
+                  <div>
+                    <span className="text-sm font-bold text-[#111827]">{c.nombre}</span>
+                    <p className="text-[10px] text-[#4b5563] font-medium uppercase tracking-tighter">
+                      {c.mensaje}
+                    </p>
+                  </div>
+                </div>
+                <span className="rounded-md bg-amber-50 px-2 py-1 text-[9px] font-extrabold text-amber-700 border border-amber-100 uppercase tracking-widest">
+                  Feliz Cumple
+                </span>
               </div>
             ))}
           </div>

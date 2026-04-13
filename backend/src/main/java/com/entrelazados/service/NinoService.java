@@ -83,6 +83,16 @@ public class NinoService {
                         () -> new RecursoNoEncontradoException("Niño no encontrado con ID biométrico: " + biometricId));
     }
 
+    @Transactional(readOnly = true)
+    public List<Nino> listarCumpleanosEnFecha(LocalDate fecha) {
+        return repo.findAllByOrderByNombreAsc().stream()
+                .filter(n -> n.getFechaNacimiento() != null
+                        && n.getFechaNacimiento().getMonthValue() == fecha.getMonthValue()
+                        && n.getFechaNacimiento().getDayOfMonth() == fecha.getDayOfMonth())
+                .map(this::toDomain)
+                .toList();
+    }
+
     Nino toDomain(NinoEntity e) {
         return new Nino(e.getId(), e.getNombre(), e.getTi(), e.getFechaNacimiento(), e.getBiometricId());
     }

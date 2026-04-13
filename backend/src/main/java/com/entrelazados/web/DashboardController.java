@@ -110,6 +110,16 @@ public class DashboardController {
         List<Map<String, Object>> enSalaAhora = asistenciaHoy.stream()
                 .filter(a -> a.get("horaSalida") == null)
                 .toList();
+        List<Map<String, Object>> cumpleanosHoy = ninoService.listarCumpleanosEnFecha(f).stream().map(n -> {
+            Map<String, Object> m = new HashMap<>();
+            m.put("id", n.id());
+            m.put("nombre", n.nombre());
+            m.put("fechaNacimiento", n.fechaNacimiento() != null ? n.fechaNacimiento().toString() : null);
+            long edad = n.fechaNacimiento() != null ? ChronoUnit.YEARS.between(n.fechaNacimiento(), f) : 0;
+            m.put("edadCumplida", (int) Math.max(edad, 0));
+            m.put("mensaje", "Hoy cumple " + Math.max(edad, 0) + " años");
+            return m;
+        }).toList();
         Map<String, Object> map = new HashMap<>();
         map.put("totalNinos", (int) dashboardService.totalNinos());
         map.put("totalAsistenciaHoy", asistenciaHoy.size());
@@ -117,6 +127,7 @@ public class DashboardController {
         map.put("asistenciaHoy", enSalaAhora);
         map.put("planesActivosHoy", planesActivosHoy);
         map.put("alertasPlanes", alertasPlanes);
+        map.put("cumpleanosHoy", cumpleanosHoy);
         return map;
     }
 }
