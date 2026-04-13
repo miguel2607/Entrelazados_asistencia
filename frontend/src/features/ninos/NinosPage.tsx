@@ -282,6 +282,7 @@ export function NinosPage() {
         open={modalOpen}
         onClose={closeModal}
         title={editingId ? 'Actualizar Información' : step === 1 ? 'Nuevo Estudiante – Paso 1 de 2' : 'Nuevo Estudiante – Paso 2 de 2'}
+        alignTop
       >
         {/* Progress bar */}
         {!editingId && (

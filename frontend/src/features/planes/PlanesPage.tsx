@@ -38,6 +38,7 @@ export function PlanesPage() {
   const [sending, setSending] = useState(false);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [busqueda, setBusqueda] = useState('');
+  const [busquedaPlan, setBusquedaPlan] = useState('');
 
   const load = () => {
     setLoading(true);
@@ -109,6 +110,8 @@ export function PlanesPage() {
   };
 
   const filteredNinos = ninos.filter(n => n.nombre.toLowerCase().includes(busqueda.toLowerCase()));
+  const filteredItemsPlan = (form.tipo === 'SERVICIO' ? servicios : paquetes)
+    .filter((item) => item.nombre.toLowerCase().includes(busquedaPlan.toLowerCase()));
 
   if (error && !loading) return <div className="p-8 text-center"><p className="text-[#d93025] font-bold bg-rose-50 p-4 rounded-2xl inline-block border border-rose-100">{error}</p></div>;
 
@@ -203,21 +206,40 @@ export function PlanesPage() {
                 <div className="animate-fade-in space-y-8">
                   <div className="flex p-1.5 rounded-2xl bg-[#f8f9fa] border-2 border-[#f1f3f4] max-w-md">
                     <button
-                      onClick={() => setForm(f => ({ ...f, tipo: 'SERVICIO', idPaquete: 0 }))}
+                      onClick={() => {
+                        setForm(f => ({ ...f, tipo: 'SERVICIO', idPaquete: 0 }));
+                        setBusquedaPlan('');
+                      }}
                       className={`flex-1 py-3 px-4 rounded-xl text-xs font-bold transition-all ${form.tipo === 'SERVICIO' ? 'bg-white text-[#2d1b69] shadow-md ring-1 ring-black/5' : 'text-[#4b5563] hover:text-[#111827]'}`}
                     >
                       Servicio Individual
                     </button>
                     <button
-                      onClick={() => setForm(f => ({ ...f, tipo: 'PAQUETE', idServicio: 0 }))}
+                      onClick={() => {
+                        setForm(f => ({ ...f, tipo: 'PAQUETE', idServicio: 0 }));
+                        setBusquedaPlan('');
+                      }}
                       className={`flex-1 py-3 px-4 rounded-xl text-xs font-bold transition-all ${form.tipo === 'PAQUETE' ? 'bg-white text-[#2d1b69] shadow-md ring-1 ring-black/5' : 'text-[#4b5563] hover:text-[#111827]'}`}
                     >
                       Paquete Mensual
                     </button>
                   </div>
 
+                  <div className="relative">
+                    <input
+                      type="text"
+                      placeholder={form.tipo === 'SERVICIO' ? 'Buscar servicio...' : 'Buscar paquete...'}
+                      value={busquedaPlan}
+                      onChange={(e) => setBusquedaPlan(e.target.value)}
+                      className="w-full rounded-2xl border-2 border-[#f1f3f4] bg-[#f8f9fa] px-6 py-4 text-sm font-bold focus:border-[#2d1b69] focus:bg-white focus:outline-none transition-all pr-12"
+                    />
+                    <svg className="absolute right-5 top-1/2 -translate-y-1/2 h-5 w-5 text-[#9ca3af]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                    </svg>
+                  </div>
+
                   <div className="grid gap-4 sm:grid-cols-2 max-h-[400px] overflow-y-auto pr-2 custom-scrollbar">
-                    {(form.tipo === 'SERVICIO' ? servicios : paquetes).map((item) => (
+                    {filteredItemsPlan.map((item) => (
                       <button
                         key={item.id}
                         onClick={() => {
@@ -246,6 +268,11 @@ export function PlanesPage() {
                         )}
                       </button>
                     ))}
+                    {filteredItemsPlan.length === 0 && (
+                      <p className="col-span-full py-10 text-center text-sm text-[#9ca3af] italic">
+                        No se encontraron {form.tipo === 'SERVICIO' ? 'servicios' : 'paquetes'} con ese nombre.
+                      </p>
+                    )}
                   </div>
 
                   <div className="flex justify-between items-center pt-8 border-t border-[#f1f3f4]">

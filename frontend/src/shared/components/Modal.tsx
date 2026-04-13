@@ -6,13 +6,14 @@ interface ModalProps {
   title: string;
   children: ReactNode;
   maxWidth?: string;
+  alignTop?: boolean;
 }
 
-export function Modal({ open, onClose, title, children, maxWidth = 'max-w-md' }: ModalProps) {
+export function Modal({ open, onClose, title, children, maxWidth = 'max-w-md', alignTop = false }: ModalProps) {
   if (!open) return null;
   return (
     <div
-      className="fixed inset-0 z-50 flex items-start sm:items-center justify-center bg-[#111827]/40 backdrop-blur-[2px] p-4 pt-10 sm:pt-4"
+      className={`fixed inset-0 z-50 flex justify-center bg-[#111827]/40 backdrop-blur-[2px] p-4 ${alignTop ? 'items-start pt-6 sm:pt-8' : 'items-start sm:items-center pt-10 sm:pt-4'}`}
       onClick={onClose}
     >
       <div
