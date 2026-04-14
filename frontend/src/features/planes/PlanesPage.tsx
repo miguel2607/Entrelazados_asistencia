@@ -14,6 +14,7 @@ interface Servicio { id: number; nombre: string; precio: number; cantidadDias: n
 interface Paquete { id: number; nombre: string; precio: number; cantidadDias: number; }
 
 export function PlanesPage() {
+  const VIGENCIA_PAQUETE_DIAS = 30;
   const [activos, setActivos] = useState<PlanActivo[]>([]);
   const [ninos, setNinos] = useState<Nino[]>([]);
   const [servicios, setServicios] = useState<Servicio[]>([]);
@@ -100,9 +101,9 @@ export function PlanesPage() {
     if (!form.fechaInicio) return null;
     const inicio = new Date(form.fechaInicio + 'T00:00:00');
     const fin = new Date(inicio);
-    fin.setDate(fin.getDate() + totalSesionesCalculadas);
+    fin.setDate(fin.getDate() + (form.tipo === 'PAQUETE' ? VIGENCIA_PAQUETE_DIAS : totalSesionesCalculadas));
     return fin;
-  }, [form.fechaInicio, totalSesionesCalculadas]);
+  }, [form.fechaInicio, form.tipo, totalSesionesCalculadas]);
 
   const formatFecha = (date: Date | null) => {
     if (!date) return '—';

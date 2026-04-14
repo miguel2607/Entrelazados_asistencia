@@ -17,6 +17,7 @@ import java.util.List;
 
 @Service
 public class NinoPlanService {
+    private static final int VIGENCIA_PAQUETE_DIAS = 30;
 
     private final NinoPlanJpaRepository repo;
     private final ServicioJpaRepository servicioRepo;
@@ -80,7 +81,7 @@ public class NinoPlanService {
         e.setIdPaquete(idPaquete);
         e.setFechaInicio(fechaInicio);
         e.setTotalSesiones(totalAcumulado);
-        e.setFechaFin(fechaInicio.plusDays(totalAcumulado)); 
+        e.setFechaFin(fechaInicio.plusDays(VIGENCIA_PAQUETE_DIAS)); 
         e.setSesionesConsumidas(sesionesConsumidas != null ? sesionesConsumidas : 0);
         e.setPrecioAcordado(precioFinal);
         e.setPorcentajeDescuento(desc);
