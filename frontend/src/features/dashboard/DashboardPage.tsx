@@ -19,7 +19,7 @@ type DashboardResponse = {
   totalNinos: number;
   totalAsistenciaHoy: number;
   totalPlanesActivosHoy: number;
-  asistenciaHoy: { id: number; idNino: number; nino: { nombre: string } }[];
+  asistenciaHoy: { id: number; idNino: number; horaEntrada?: string | null; nino: { nombre: string } }[];
   planesActivosHoy: { idNino?: number; nombreNino?: string; tipo: string; nombre: string; sesionesRestantes: number; servicios: { nombre: string }[] }[];
   alertasPlanes: AlertaPlan[];
   cumpleanosHoy: { id: number; nombre: string; fechaNacimiento: string; edadCumplida: number; mensaje: string }[];
@@ -40,6 +40,7 @@ export function DashboardPage() {
   // Live update state for "En Sala Ahora"
   const [liveAsistencia, setLiveAsistencia] = useState<DashboardResponse['asistenciaHoy']>([]);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
+  const [clockNow, setClockNow] = useState<Date>(new Date());
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   // Wizard añadir niño
@@ -199,6 +200,42 @@ export function DashboardPage() {
     };
   }, [fetchLiveData]);
 
+  useEffect(() => {
+    const clockRef = setInterval(() => setClockNow(new Date()), 1000);
+    return () => clearInterval(clockRef);
+  }, []);
+
+  const formatTiempoEnSala = useCallback((horaEntrada?: string | null) => {
+    if (!horaEntrada) return 'Tiempo no disponible';
+    const [h, m, s] = horaEntrada.split(':').map((part) => Number.parseInt(part, 10));
+    if ([h, m, s].some((value) => Number.isNaN(value))) return 'Tiempo no disponible';
+
+    const inicio = new Date(clockNow);
+    inicio.setHours(h, m, s, 0);
+    let diffMs = clockNow.getTime() - inicio.getTime();
+    if (diffMs < 0) diffMs = 0;
+
+    const totalSeconds = Math.floor(diffMs / 1000);
+    const hours = Math.floor(totalSeconds / 3600);
+    const minutes = Math.floor((totalSeconds % 3600) / 60);
+    const seconds = totalSeconds % 60;
+
+    if (hours > 0) {
+      return `${hours}h ${String(minutes).padStart(2, '0')}m`;
+    }
+    return `${minutes}m ${String(seconds).padStart(2, '0')}s`;
+  }, [clockNow]);
+
+  const formatHoraEntrada = useCallback((horaEntrada?: string | null) => {
+    if (!horaEntrada) return 'Hora no disponible';
+    const [h, m, s] = horaEntrada.split(':').map((part) => Number.parseInt(part, 10));
+    if ([h, m, s].some((value) => Number.isNaN(value))) return horaEntrada;
+
+    const fecha = new Date();
+    fecha.setHours(h, m, s, 0);
+    return fecha.toLocaleTimeString('es-CO');
+  }, []);
+
   const desestimarAlerta = (id: number) => {
     api.post(`/planes/${id}/desestimar-alerta`, {}).then(() => {
       setData(prev => prev ? { ...prev, alertasPlanes: prev.alertasPlanes.filter(a => a.idPlan !== id) } : null);
@@ -341,12 +378,15 @@ export function DashboardPage() {
                     {(a.nino?.nombre ?? 'E').charAt(0)}
                   </div>
                   <div className="min-w-0 flex-1">
-                    <p className="truncate text-xl font-extrabold leading-tight text-[#111827] sm:text-2xl">
+                    <p className="whitespace-normal break-words text-base font-extrabold leading-snug text-[#111827] sm:text-lg">
                       {a.nino?.nombre ?? 'Estudiante'}
                     </p>
                     <span className="mt-1 inline-block rounded-lg bg-cyan-100 px-2.5 py-1 text-[11px] font-extrabold uppercase tracking-widest text-[#0e7490]">
-                      Dentro
+                      {formatTiempoEnSala(a.horaEntrada)}
                     </span>
+                    <p className="mt-1 text-xs font-semibold text-[#4b5563]">
+                      Entró: <span className="font-mono text-[#111827]">{formatHoraEntrada(a.horaEntrada)}</span>
+                    </p>
                   </div>
                 </li>
               ))}

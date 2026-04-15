@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 
@@ -42,6 +43,7 @@ const navItems = [
 export function Layout() {
   const { username, logout } = useAuth();
   const navigate = useNavigate();
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
 
   function handleLogout() {
     logout();
@@ -51,17 +53,36 @@ export function Layout() {
   return (
     <div className="flex h-screen overflow-hidden bg-[#f8f7ff]">
       {/* Sidebar */}
-      <aside className="w-64 border-r border-[#e2e8f0] bg-white pt-6">
-        <div className="mb-10 flex items-center gap-3 px-6 animate-fade-in">
+      <aside className={`${sidebarCollapsed ? 'w-20' : 'w-64'} border-r border-[#e2e8f0] bg-white pt-6 transition-all duration-300`}>
+        <div className={`mb-10 flex items-center ${sidebarCollapsed ? 'justify-center px-2' : 'gap-3 px-6'} animate-fade-in`}>
           <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-[#2d1b69] to-[#4c1d95] text-white shadow-lg shadow-indigo-200">
             <span className="text-xl font-bold">P</span>
           </div>
-          <span className="text-xl font-bold tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-[#2d1b69] to-[#4c1d95]">
-            Playroom
-          </span>
+          {!sidebarCollapsed && (
+            <span className="text-xl font-bold tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-[#2d1b69] to-[#4c1d95]">
+              Playroom
+            </span>
+          )}
+        </div>
+
+        <div className={`mb-4 flex ${sidebarCollapsed ? 'justify-center px-2' : 'justify-end px-4'}`}>
+          <button
+            type="button"
+            onClick={() => setSidebarCollapsed((prev) => !prev)}
+            className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-[#e2e8f0] text-[#4b5563] hover:bg-[#f8f9fa] hover:text-[#111827]"
+            title={sidebarCollapsed ? 'Expandir menú' : 'Colapsar menú'}
+          >
+            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              {sidebarCollapsed ? (
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+              ) : (
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+              )}
+            </svg>
+          </button>
         </div>
         
-        <nav className="space-y-1.5 px-3">
+        <nav className={`space-y-1.5 ${sidebarCollapsed ? 'px-2' : 'px-3'}`}>
           {navItems.map((item, idx) => (
             <NavLink
               key={item.to}
@@ -69,7 +90,7 @@ export function Layout() {
               end={item.end}
               className={({ isActive }) =>
                 [
-                  'flex items-center gap-3 rounded-xl px-4 py-3 text-sm font-semibold transition-all duration-300 animate-slide-in-right',
+                  `flex items-center rounded-xl py-3 text-sm font-semibold transition-all duration-300 animate-slide-in-right ${sidebarCollapsed ? 'justify-center px-2' : 'gap-3 px-4'}`,
                   `stagger-${(idx % 5) + 1}`,
                   isActive
                     ? 'bg-indigo-50 text-[#2d1b69] shadow-sm'
@@ -80,7 +101,7 @@ export function Layout() {
               {({ isActive }) => (
                 <>
                   {item.icon(isActive)}
-                  {item.label}
+                  {!sidebarCollapsed && item.label}
                 </>
               )}
             </NavLink>
