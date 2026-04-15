@@ -1,5 +1,6 @@
 import { useEffect, useState, useMemo } from 'react';
 import { api } from '../../shared/api/apiClient';
+import { fechaLocalYYYYMMDD } from '../../shared/fechaLocal';
 
 type Nino = { id: number; nombre: string };
 type AsistenciaItem = {
@@ -21,15 +22,15 @@ type ServicioPaquete = { id: number; nombre: string; precio: number };
 type AsistenciaHistorialItem = { id: number; fecha: string; horaEntrada: string | null; horaSalida: string | null; jornada: string | null; observacion: string | null };
 
 export function AsistenciaPage() {
-  const [fecha, setFecha] = useState(() => new Date().toISOString().slice(0, 10));
+  const [fecha, setFecha] = useState(() => fechaLocalYYYYMMDD());
   const [ninos, setNinos] = useState<Nino[]>([]);
   const [asistencia, setAsistencia] = useState<AsistenciaItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   const [historialNinoId, setHistorialNinoId] = useState<string>('');
-  const [historialDesde, setHistorialDesde] = useState(() => new Date().toISOString().slice(0, 10));
-  const [historialHasta, setHistorialHasta] = useState(() => new Date().toISOString().slice(0, 10));
+  const [historialDesde, setHistorialDesde] = useState(() => fechaLocalYYYYMMDD());
+  const [historialHasta, setHistorialHasta] = useState(() => fechaLocalYYYYMMDD());
   const [historialData, setHistorialData] = useState<AsistenciaHistorialItem[]>([]);
   const [loadingHistorial, setLoadingHistorial] = useState(false);
   const [observacionPorAsistenciaId, setObservacionPorAsistenciaId] = useState<Record<number, string>>({});
@@ -198,7 +199,7 @@ export function AsistenciaPage() {
     registrarEntrada(Number(nuevaAsistenciaNinoId), idPlan, idServicio, nuevaAsistenciaJornada, '');
   };
 
-  const isToday = fecha === new Date().toISOString().slice(0, 10);
+  const isToday = fecha === fechaLocalYYYYMMDD();
 
   return (
     <div className="max-w-7xl mx-auto space-y-10 pb-20">

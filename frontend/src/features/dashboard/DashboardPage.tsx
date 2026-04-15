@@ -1,5 +1,6 @@
 import { useEffect, useState, useCallback, useRef } from 'react';
 import { api } from '../../shared/api/apiClient';
+import { fechaLocalYYYYMMDD } from '../../shared/fechaLocal';
 import { Modal } from '../../shared/components/Modal';
 
 type AlertaPlan = {
@@ -28,7 +29,8 @@ type NinoResumen = { id: number; nombre: string; biometricId?: string };
 type Step1Form = { nombre: string; ti: string; fechaNacimiento: string; biometricId: string };
 type Step2Form = { nombre: string; cc: string; telefono: string; parentesco: string };
 
-const LIVE_POLL_INTERVAL = 10000; // 10 seconds
+/** Intervalo de actualización del listado en sala (dashboard completo; equilibrio entre “en vivo” y carga al servidor). */
+const LIVE_POLL_INTERVAL = 2000;
 
 export function DashboardPage() {
   const [data, setData] = useState<DashboardResponse | null>(null);
@@ -154,7 +156,7 @@ export function DashboardPage() {
         parentesco: step2.parentesco || 'Familiar',
       });
       closeWizard();
-      api.get<DashboardResponse>('/dashboard').then(setData);
+      api.get<DashboardResponse>('/dashboard', { fecha: fechaLocalYYYYMMDD() }).then(setData);
     } catch (err: any) {
       setWizardError(err.message);
     } finally {
@@ -164,12 +166,12 @@ export function DashboardPage() {
 
   const omitirAcudienteWizard = () => {
     closeWizard();
-    api.get<DashboardResponse>('/dashboard').then(setData);
+    api.get<DashboardResponse>('/dashboard', { fecha: fechaLocalYYYYMMDD() }).then(setData);
   };
 
   // Fetch live attendance data
   const fetchLiveData = useCallback(() => {
-    api.get<DashboardResponse>('/dashboard')
+    api.get<DashboardResponse>('/dashboard', { fecha: fechaLocalYYYYMMDD() })
       .then((newData) => {
         setLiveAsistencia(newData.asistenciaHoy);
         setData(newData);
@@ -179,7 +181,7 @@ export function DashboardPage() {
   }, []);
 
   useEffect(() => {
-    api.get<DashboardResponse>('/dashboard')
+    api.get<DashboardResponse>('/dashboard', { fecha: fechaLocalYYYYMMDD() })
       .then((d) => {
         setData(d);
         setLiveAsistencia(d.asistenciaHoy);
@@ -219,7 +221,7 @@ export function DashboardPage() {
   if (!data) return null;
 
   return (
-    <div className="space-y-10 max-w-6xl">
+    <div className="space-y-10 max-w-7xl">
       <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-end animate-fade-in">
         <div>
           <h2 className="text-3xl font-extrabold text-[#111827] tracking-tight">
@@ -276,94 +278,108 @@ export function DashboardPage() {
         </div>
       </div>
 
-      <div className="grid gap-8 lg:grid-cols-5">
-        <div className="google-card lg:col-span-3 animate-fade-in stagger-4">
-          <h3 className="text-xs font-bold text-[#4b5563] uppercase tracking-widest mb-8">Flujo de Actividad</h3>
-          <div className="flex items-end justify-around h-48 gap-4 px-4">
-            {[
-              { label: 'Asistencia', value: data.totalAsistenciaHoy, color: 'bg-gradient-to-t from-[#06b6d4] to-[#22d3ee]' },
-              { label: 'Planes', value: data.totalPlanesActivosHoy, color: 'bg-gradient-to-t from-[#c026d3] to-[#e879f9]' },
-              { label: 'Niños', value: data.totalNinos, color: 'bg-gradient-to-t from-[#2d1b69] to-[#6d28d9]' },
-            ].map((item, idx) => {
-              const max = Math.max(data.totalNinos, data.totalAsistenciaHoy, data.totalPlanesActivosHoy, 1);
-              const height = (item.value / max) * 100;
-              return (
-                <div key={item.label} className="flex flex-col items-center gap-3 w-full max-w-[70px]">
-                  <div className="relative flex h-32 w-full items-end overflow-hidden rounded-full bg-[#f8f9fa]">
-                    <div
-                      className={`${item.color} w-full transition-all duration-1000 ease-out animate-fade-in stagger-${idx + 1}`}
-                      style={{ height: `${height}%` }}
-                    />
-                  </div>
-                  <div className="text-center">
-                    <p className="text-[10px] font-bold text-[#4b5563] uppercase truncate w-full tracking-tighter">{item.label}</p>
-                    <p className="text-sm font-extrabold text-[#111827]">{item.value}</p>
-                  </div>
-                </div>
-              );
-            })}
+      {/* EN SALA AHORA — bloque destacado a ancho completo */}
+      <section className="animate-fade-in stagger-4 relative overflow-hidden rounded-3xl border-2 border-cyan-100/80 bg-gradient-to-br from-white via-[#f8fdff] to-[#f0f9ff] p-6 shadow-xl shadow-cyan-100/40 sm:p-8 lg:p-10">
+        <div className="pointer-events-none absolute -right-20 -top-20 h-64 w-64 rounded-full bg-cyan-200/20 blur-3xl" />
+        <div className="pointer-events-none absolute -bottom-16 -left-16 h-48 w-48 rounded-full bg-[#2d1b69]/10 blur-3xl" />
+        <div className="relative flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between">
+          <div className="space-y-2">
+            <div className="flex flex-wrap items-center gap-3">
+              <h3 className="text-2xl font-extrabold tracking-tight text-[#111827] sm:text-3xl">En sala ahora</h3>
+              <span className="inline-flex items-center gap-2 rounded-full border border-cyan-200 bg-cyan-50 px-3 py-1 text-[11px] font-extrabold uppercase tracking-widest text-[#0891b2]">
+                <span className="h-2 w-2 rounded-full bg-[#06b6d4] animate-ping" />
+                En vivo
+              </span>
+            </div>
+            <p className="max-w-xl text-sm text-[#4b5563]">
+              Estudiantes con entrada registrada y sin salida en el día. Se actualiza automáticamente.
+            </p>
+            {lastUpdated && (
+              <p className="text-sm font-semibold text-[#6b7280]">
+                Última actualización:{' '}
+                <span className="font-mono text-[#111827]">{lastUpdated.toLocaleTimeString('es-CO')}</span>
+              </p>
+            )}
+          </div>
+          <div className="flex shrink-0 flex-col items-stretch gap-3 sm:flex-row sm:items-center lg:flex-col lg:items-end">
+            <div className="rounded-2xl border border-cyan-100 bg-white/90 px-6 py-4 text-center shadow-sm backdrop-blur-sm">
+              <p className="text-[11px] font-extrabold uppercase tracking-widest text-[#6b7280]">Total adentro</p>
+              <p className="mt-1 text-5xl font-black tabular-nums leading-none text-[#06b6d4] sm:text-6xl">
+                {liveAsistencia.length}
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={fetchLiveData}
+              className="inline-flex items-center justify-center gap-2 rounded-xl border-2 border-cyan-200 bg-white px-5 py-3 text-sm font-extrabold uppercase tracking-widest text-[#0891b2] shadow-sm transition hover:border-cyan-300 hover:bg-cyan-50"
+            >
+              <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+              </svg>
+              Actualizar ahora
+            </button>
           </div>
         </div>
 
-        {/* EN SALA AHORA — Live Updates */}
-        <div className="google-card lg:col-span-2 animate-fade-in stagger-5 relative overflow-hidden">
-          <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-[#06b6d4] via-[#2d1b69] to-[#c026d3]" />
-          <div className="flex items-center justify-between mb-4">
-            <div className="flex items-center gap-2">
-              <h3 className="text-xs font-bold text-[#4b5563] uppercase tracking-widest">En Sala Ahora</h3>
-              <span className="inline-flex items-center gap-1 rounded-full bg-cyan-50 border border-cyan-200 px-2 py-0.5 text-[9px] font-extrabold text-[#06b6d4] uppercase tracking-widest">
-                <span className="h-1.5 w-1.5 rounded-full bg-[#06b6d4] animate-ping" />
-                EN VIVO
-              </span>
+        <div className="relative mt-8 min-h-[200px] rounded-2xl border border-[#e0f2fe] bg-white/60 p-4 backdrop-blur-sm sm:p-6">
+          {liveAsistencia.length === 0 ? (
+            <div className="flex min-h-[200px] flex-col items-center justify-center gap-3 py-10 text-center text-[#9ca3af]">
+              <svg className="h-16 w-16 text-[#e2e8f0]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+              </svg>
+              <p className="text-lg font-bold text-[#6b7280]">Nadie en sala en este momento</p>
+              <p className="text-sm">Cuando registren entrada, aparecerán aquí con letra grande.</p>
             </div>
-            <div className="flex items-center gap-2">
-              <span className="flex h-2.5 w-2.5 rounded-full bg-[#06b6d4] animate-live-pulse" />
-            </div>
-          </div>
-          {lastUpdated && (
-            <p className="text-[9px] text-[#9ca3af] mb-3 font-medium">
-              Última actualización: {lastUpdated.toLocaleTimeString('es-CO')}
-            </p>
-          )}
-          <div className="max-h-[220px] overflow-y-auto space-y-2 pr-2 custom-scrollbar">
-            {liveAsistencia.length === 0 && (
-              <div className="flex flex-col items-center justify-center py-8 opacity-50">
-                <svg className="h-10 w-10 text-[#e2e8f0]" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
-                <p className="text-xs mt-2">Sin registros</p>
-              </div>
-            )}
-            {liveAsistencia.map((a, idx) => (
-              <div
-                key={a.id}
-                className={`flex items-center justify-between p-3 rounded-xl border border-transparent bg-[#f8f7ff] hover:border-[#e2e8f0] hover:bg-white transition-all animate-slide-in-right stagger-${(idx % 5) + 1}`}
-              >
-                <div className="flex items-center gap-3">
-                  <div className="h-7 w-7 rounded-full bg-gradient-to-br from-[#06b6d4] to-[#2d1b69] flex items-center justify-center text-white text-[10px] font-bold">
+          ) : (
+            <ul className="grid max-h-[min(55vh,520px)] grid-cols-1 gap-4 overflow-y-auto pr-1 custom-scrollbar sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+              {liveAsistencia.map((a, idx) => (
+                <li
+                  key={a.id}
+                  className={`flex items-center gap-4 rounded-2xl border-2 border-white bg-gradient-to-br from-[#f0fdfa] to-white p-5 shadow-md shadow-cyan-100/50 transition hover:border-cyan-200 hover:shadow-lg animate-slide-in-right stagger-${(idx % 5) + 1}`}
+                >
+                  <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-[#06b6d4] to-[#2d1b69] text-2xl font-black text-white shadow-inner">
                     {(a.nino?.nombre ?? 'E').charAt(0)}
                   </div>
-                  <span className="text-sm font-bold text-[#111827]">{a.nino?.nombre ?? 'Estudiante'}</span>
-                </div>
-                <span className="rounded-md bg-cyan-50 px-2 py-1 text-[9px] font-extrabold text-[#06b6d4] border border-cyan-100 uppercase tracking-widest">
-                  PRESENTE
-                </span>
-              </div>
-            ))}
-          </div>
-          {liveAsistencia.length > 0 && (
-            <div className="mt-3 pt-3 border-t border-[#f1f3f4] flex items-center justify-between">
-              <span className="text-[10px] font-bold text-[#4b5563] uppercase tracking-widest">{liveAsistencia.length} en sala</span>
-              <button
-                type="button"
-                onClick={fetchLiveData}
-                className="text-[10px] font-bold text-[#06b6d4] hover:text-[#0891b2] uppercase tracking-widest transition-colors flex items-center gap-1"
-              >
-                <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                </svg>
-                Actualizar
-              </button>
-            </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-xl font-extrabold leading-tight text-[#111827] sm:text-2xl">
+                      {a.nino?.nombre ?? 'Estudiante'}
+                    </p>
+                    <span className="mt-1 inline-block rounded-lg bg-cyan-100 px-2.5 py-1 text-[11px] font-extrabold uppercase tracking-widest text-[#0e7490]">
+                      Dentro
+                    </span>
+                  </div>
+                </li>
+              ))}
+            </ul>
           )}
+        </div>
+      </section>
+
+      <div className="google-card animate-fade-in stagger-5">
+        <h3 className="text-xs font-bold text-[#4b5563] uppercase tracking-widest mb-8">Flujo de Actividad</h3>
+        <div className="flex items-end justify-around h-48 gap-4 px-4">
+          {[
+            { label: 'Asistencia', value: data.totalAsistenciaHoy, color: 'bg-gradient-to-t from-[#06b6d4] to-[#22d3ee]' },
+            { label: 'Planes', value: data.totalPlanesActivosHoy, color: 'bg-gradient-to-t from-[#c026d3] to-[#e879f9]' },
+            { label: 'Niños', value: data.totalNinos, color: 'bg-gradient-to-t from-[#2d1b69] to-[#6d28d9]' },
+          ].map((item, idx) => {
+            const max = Math.max(data.totalNinos, data.totalAsistenciaHoy, data.totalPlanesActivosHoy, 1);
+            const height = (item.value / max) * 100;
+            return (
+              <div key={item.label} className="flex flex-col items-center gap-3 w-full max-w-[120px]">
+                <div className="relative flex h-32 w-full items-end overflow-hidden rounded-full bg-[#f8f9fa]">
+                  <div
+                    className={`${item.color} w-full transition-all duration-1000 ease-out animate-fade-in stagger-${idx + 1}`}
+                    style={{ height: `${height}%` }}
+                  />
+                </div>
+                <div className="text-center">
+                  <p className="text-[10px] font-bold text-[#4b5563] uppercase truncate w-full tracking-tighter">{item.label}</p>
+                  <p className="text-sm font-extrabold text-[#111827]">{item.value}</p>
+                </div>
+              </div>
+            );
+          })}
         </div>
       </div>
 
