@@ -42,6 +42,11 @@ app:
     expirationMs: ${APP_JWT_EXPIRATIONMS:86400000}
   cors:
     allowedOrigins: ${APP_CORS_ALLOWEDORIGINS:http://localhost:5173,http://localhost:5174}
+  attendance:
+    autoCheckout:
+      enabled: ${APP_ATTENDANCE_AUTOCHECKOUT_ENABLED:true}
+      cron: ${APP_ATTENDANCE_AUTOCHECKOUT_CRON:0 0 19 * * *}
+      zone: ${APP_ATTENDANCE_AUTOCHECKOUT_ZONE:America/Bogota}
 
 hikvision:
   ip: ${HIKVISION_IP:192.168.68.85}

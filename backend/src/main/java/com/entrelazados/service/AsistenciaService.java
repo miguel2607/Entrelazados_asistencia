@@ -170,6 +170,27 @@ public class AsistenciaService {
         repo.delete(e);
     }
 
+    @Transactional
+    public int registrarSalidasAutomaticas(LocalDate fecha, LocalTime horaSalida, String observacionAutomatica) {
+        List<AsistenciaEntity> asistenciasAbiertas = repo.findByFechaAndHoraSalidaIsNullOrderByIdAsc(fecha);
+        if (asistenciasAbiertas.isEmpty()) {
+            return 0;
+        }
+
+        for (AsistenciaEntity asistencia : asistenciasAbiertas) {
+            asistencia.setHoraSalida(horaSalida);
+            String observacionActual = asistencia.getObservacion();
+            if (observacionActual == null || observacionActual.isBlank()) {
+                asistencia.setObservacion(observacionAutomatica);
+            } else if (!observacionActual.contains(observacionAutomatica)) {
+                asistencia.setObservacion(observacionActual + " | " + observacionAutomatica);
+            }
+        }
+
+        repo.saveAll(asistenciasAbiertas);
+        return asistenciasAbiertas.size();
+    }
+
     private Asistencia toDomain(AsistenciaEntity e) {
         return new Asistencia(e.getId(), e.getIdNino(), e.getIdPlan(), e.getIdServicio(), e.getFecha(),
                 e.getHoraEntrada(), e.getHoraSalida(), e.getJornada(), e.getObservacion());

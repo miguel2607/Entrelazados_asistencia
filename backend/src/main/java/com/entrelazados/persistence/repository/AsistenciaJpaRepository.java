@@ -24,4 +24,6 @@ public interface AsistenciaJpaRepository extends JpaRepository<AsistenciaEntity,
     List<AsistenciaEntity> findByIdNinoAndFechaOrderByIdAsc(Integer idNino, LocalDate fecha);
 
     List<AsistenciaEntity> findByIdNinoAndFechaBetweenOrderByFechaDesc(Integer idNino, LocalDate desde, LocalDate hasta);
+
+    List<AsistenciaEntity> findByFechaAndHoraSalidaIsNullOrderByIdAsc(LocalDate fecha);
 }
