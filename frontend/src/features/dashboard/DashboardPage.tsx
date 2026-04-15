@@ -236,6 +236,15 @@ export function DashboardPage() {
     return fecha.toLocaleTimeString('es-CO');
   }, []);
 
+  const segundosDelDia = useCallback((hora?: string | null) => {
+    if (!hora) return Number.MAX_SAFE_INTEGER;
+    const [h, m, s] = hora.split(':').map((part) => Number.parseInt(part, 10));
+    if ([h, m, s].some((value) => Number.isNaN(value))) return Number.MAX_SAFE_INTEGER;
+    return (h * 3600) + (m * 60) + s;
+  }, []);
+
+  const asistenciaOrdenada = [...liveAsistencia].sort((a, b) => segundosDelDia(a.horaEntrada) - segundosDelDia(b.horaEntrada));
+
   const desestimarAlerta = (id: number) => {
     api.post(`/planes/${id}/desestimar-alerta`, {}).then(() => {
       setData(prev => prev ? { ...prev, alertasPlanes: prev.alertasPlanes.filter(a => a.idPlan !== id) } : null);
@@ -358,7 +367,7 @@ export function DashboardPage() {
           </div>
         </div>
 
-        <div className="relative mt-8 min-h-[200px] rounded-2xl border border-[#e0f2fe] bg-white/60 p-4 backdrop-blur-sm sm:p-6">
+        <div className="relative mt-8 min-h-[640px] rounded-2xl border border-[#e0f2fe] bg-white/60 p-4 backdrop-blur-sm sm:p-6">
           {liveAsistencia.length === 0 ? (
             <div className="flex min-h-[200px] flex-col items-center justify-center gap-3 py-10 text-center text-[#9ca3af]">
               <svg className="h-16 w-16 text-[#e2e8f0]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -368,17 +377,17 @@ export function DashboardPage() {
               <p className="text-sm">Cuando registren entrada, aparecerán aquí con letra grande.</p>
             </div>
           ) : (
-            <ul className="grid max-h-[min(55vh,520px)] grid-cols-1 gap-4 overflow-y-auto pr-1 custom-scrollbar sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-              {liveAsistencia.map((a, idx) => (
+            <ul className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
+              {asistenciaOrdenada.map((a, idx) => (
                 <li
                   key={a.id}
-                  className={`flex items-center gap-4 rounded-2xl border-2 border-white bg-gradient-to-br from-[#f0fdfa] to-white p-5 shadow-md shadow-cyan-100/50 transition hover:border-cyan-200 hover:shadow-lg animate-slide-in-right stagger-${(idx % 5) + 1}`}
+                  className={`flex min-h-[96px] items-center gap-3 rounded-2xl border-2 border-white bg-gradient-to-br from-[#f0fdfa] to-white p-4 shadow-md shadow-cyan-100/50 transition hover:border-cyan-200 hover:shadow-lg animate-slide-in-right stagger-${(idx % 5) + 1}`}
                 >
-                  <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-[#06b6d4] to-[#2d1b69] text-2xl font-black text-white shadow-inner">
+                  <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-[#06b6d4] to-[#2d1b69] text-xl font-black text-white shadow-inner">
                     {(a.nino?.nombre ?? 'E').charAt(0)}
                   </div>
                   <div className="min-w-0 flex-1">
-                    <p className="whitespace-normal break-words text-base font-extrabold leading-snug text-[#111827] sm:text-lg">
+                    <p className="whitespace-normal break-words text-lg font-extrabold leading-tight text-[#111827]">
                       {a.nino?.nombre ?? 'Estudiante'}
                     </p>
                     <span className="mt-1 inline-block rounded-lg bg-cyan-100 px-2.5 py-1 text-[11px] font-extrabold uppercase tracking-widest text-[#0e7490]">
