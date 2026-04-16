@@ -346,8 +346,8 @@ export function DashboardPage() {
           <div className="space-y-2">
             <div className="flex flex-wrap items-center gap-3">
               <h3 className="text-2xl font-extrabold tracking-tight text-[#111827] sm:text-3xl">En sala ahora</h3>
-              <span className="inline-flex items-center gap-2 rounded-full border border-indigo-200 bg-indigo-50 px-3 py-1 text-[11px] font-extrabold uppercase tracking-widest text-[#2d1b69]">
-                <span className="h-2 w-2 rounded-full bg-[#4c1d95] animate-ping" />
+              <span className="inline-flex items-center gap-2 rounded-full border border-orange-200 bg-orange-50 px-3 py-1 text-[11px] font-extrabold uppercase tracking-widest text-orange-700">
+                <span className="h-2 w-2 rounded-full bg-orange-500 animate-ping" />
                 En vivo
               </span>
             </div>
@@ -371,7 +371,7 @@ export function DashboardPage() {
             <button
               type="button"
               onClick={fetchLiveData}
-              className="inline-flex items-center justify-center gap-2 rounded-xl border-2 border-indigo-200 bg-white px-5 py-3 text-sm font-extrabold uppercase tracking-widest text-[#2d1b69] shadow-sm transition hover:border-indigo-300 hover:bg-indigo-50"
+              className="inline-flex items-center justify-center gap-2 rounded-xl border-2 border-orange-300 bg-gradient-to-r from-amber-400 to-orange-500 px-5 py-3 text-sm font-extrabold uppercase tracking-widest text-white shadow-sm transition hover:from-amber-500 hover:to-orange-600"
             >
               <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
@@ -404,7 +404,7 @@ export function DashboardPage() {
                     <p className="whitespace-normal break-words text-lg font-extrabold leading-tight text-[#111827]">
                       {a.nino?.nombre ?? 'Estudiante'}
                     </p>
-                    <span className="mt-1 inline-block rounded-lg bg-indigo-50 px-2.5 py-1 text-[11px] font-extrabold uppercase tracking-widest text-[#4c1d95]">
+                    <span className="mt-1 inline-block rounded-lg bg-orange-50 border border-orange-100 px-2.5 py-1 text-[11px] font-extrabold uppercase tracking-widest text-orange-700">
                       {formatTiempoEnSala(a.horaEntrada)}
                     </span>
                     <p className="mt-1 text-xs font-semibold text-[#4b5563]">
