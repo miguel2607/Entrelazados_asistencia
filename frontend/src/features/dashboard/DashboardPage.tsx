@@ -29,9 +29,12 @@ type AlertaTiempo = {
 
 type DashboardResponse = {
   totalNinos: number;
+  totalPapas: number;
   totalAsistenciaHoy: number;
+  totalAsistenciaPapasHoy: number;
   totalPlanesActivosHoy: number;
   asistenciaHoy: { id: number; idNino: number; horaEntrada?: string | null; nino: { nombre: string } }[];
+  asistenciaPapasHoy: { id: number; idPapa: number; horaEntrada?: string | null; papa: { nombre: string } }[];
   planesActivosHoy: { idNino?: number; nombreNino?: string; tipo: string; nombre: string; sesionesRestantes: number; servicios: { nombre: string }[] }[];
   alertasPlanes: AlertaPlan[];
   alertasTiempo: AlertaTiempo[];
@@ -52,6 +55,7 @@ export function DashboardPage() {
 
   // Live update state for "En Sala Ahora"
   const [liveAsistencia, setLiveAsistencia] = useState<DashboardResponse['asistenciaHoy']>([]);
+  const [liveAsistenciaPapas, setLiveAsistenciaPapas] = useState<DashboardResponse['asistenciaPapasHoy']>([]);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
   const [clockNow, setClockNow] = useState<Date>(new Date());
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -188,6 +192,7 @@ export function DashboardPage() {
     api.get<DashboardResponse>('/dashboard', { fecha: fechaLocalYYYYMMDD() })
       .then((newData) => {
         setLiveAsistencia(newData.asistenciaHoy);
+        setLiveAsistenciaPapas(newData.asistenciaPapasHoy ?? []);
         setData(newData);
         setLastUpdated(new Date());
       })
@@ -199,6 +204,7 @@ export function DashboardPage() {
       .then((d) => {
         setData(d);
         setLiveAsistencia(d.asistenciaHoy);
+        setLiveAsistenciaPapas(d.asistenciaPapasHoy ?? []);
         setLastUpdated(new Date());
       })
       .catch((e) => setError(e.message))
@@ -257,6 +263,7 @@ export function DashboardPage() {
   }, []);
 
   const asistenciaOrdenada = [...liveAsistencia].sort((a, b) => segundosDelDia(a.horaEntrada) - segundosDelDia(b.horaEntrada));
+  const asistenciaPapasOrdenada = [...liveAsistenciaPapas].sort((a, b) => segundosDelDia(a.horaEntrada) - segundosDelDia(b.horaEntrada));
 
   const desestimarAlerta = (id: number) => {
     api.post(`/planes/${id}/desestimar-alerta`, {}).then(() => {
@@ -310,7 +317,7 @@ export function DashboardPage() {
         </div>
       </div>
 
-      <div className="grid gap-6 md:grid-cols-3">
+      <div className="grid gap-6 md:grid-cols-5">
         <div className="animate-scale-in stagger-1">
           <StatCard
             label="Niños Registrados"
@@ -321,10 +328,26 @@ export function DashboardPage() {
         </div>
         <div className="animate-scale-in stagger-2">
           <StatCard
+            label="Papás Registrados"
+            value={data.totalPapas ?? 0}
+            accent="bg-[#7c3aed]"
+            description="Padres activos en el módulo"
+          />
+        </div>
+        <div className="animate-scale-in stagger-2">
+          <StatCard
             label="Asistencias hoy"
             value={data.totalAsistenciaHoy}
             accent="bg-[#06b6d4]"
             description="Ingresos registrados hoy"
+          />
+        </div>
+        <div className="animate-scale-in stagger-3">
+          <StatCard
+            label="Asistencias papás"
+            value={data.totalAsistenciaPapasHoy ?? 0}
+            accent="bg-[#0ea5e9]"
+            description="Ingresos de papás hoy"
           />
         </div>
         <div className="animate-scale-in stagger-3">
@@ -404,6 +427,61 @@ export function DashboardPage() {
                       {a.nino?.nombre ?? 'Estudiante'}
                     </p>
                     <span className="mt-1 inline-block rounded-lg bg-indigo-50 px-2.5 py-1 text-[11px] font-extrabold uppercase tracking-widest text-[#4c1d95]">
+                      {formatTiempoEnSala(a.horaEntrada)}
+                    </span>
+                    <p className="mt-1 text-xs font-semibold text-[#4b5563]">
+                      Entró: <span className="font-mono text-[#111827]">{formatHoraEntrada(a.horaEntrada)}</span>
+                    </p>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      </section>
+
+      <section className="animate-fade-in stagger-4 relative overflow-hidden rounded-3xl border-2 border-cyan-100/80 bg-gradient-to-br from-white via-[#f8fdff] to-[#f0f9ff] p-6 shadow-xl shadow-cyan-100/40 sm:p-8 lg:p-10">
+        <div className="pointer-events-none absolute -right-20 -top-20 h-64 w-64 rounded-full bg-cyan-300/20 blur-3xl" />
+        <div className="relative flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between">
+          <div className="space-y-2">
+            <div className="flex flex-wrap items-center gap-3">
+              <h3 className="text-2xl font-extrabold tracking-tight text-[#111827] sm:text-3xl">Papás en sala ahora</h3>
+              <span className="inline-flex items-center gap-2 rounded-full border border-cyan-200 bg-cyan-50 px-3 py-1 text-[11px] font-extrabold uppercase tracking-widest text-cyan-700">
+                <span className="h-2 w-2 rounded-full bg-cyan-500 animate-ping" />
+                En vivo
+              </span>
+            </div>
+            <p className="max-w-xl text-sm text-[#4b5563]">
+              Papás con entrada registrada y sin salida en el día.
+            </p>
+          </div>
+          <div className="rounded-2xl border border-cyan-100 bg-white/90 px-6 py-4 text-center shadow-sm backdrop-blur-sm">
+            <p className="text-[11px] font-extrabold uppercase tracking-widest text-[#6b7280]">Total adentro</p>
+            <p className="mt-1 text-5xl font-black tabular-nums leading-none text-cyan-700 sm:text-6xl">
+              {liveAsistenciaPapas.length}
+            </p>
+          </div>
+        </div>
+        <div className="relative mt-8 rounded-2xl border border-[#e0f2fe] bg-white/60 p-4 backdrop-blur-sm sm:p-6">
+          {liveAsistenciaPapas.length === 0 ? (
+            <div className="py-10 text-center text-[#9ca3af]">
+              <p className="text-sm font-bold">No hay papás en sala en este momento.</p>
+            </div>
+          ) : (
+            <ul className="grid max-h-[min(55vh,520px)] grid-cols-1 gap-4 overflow-y-auto pr-1 custom-scrollbar sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+              {asistenciaPapasOrdenada.map((a, idx) => (
+                <li
+                  key={a.id}
+                  className={`flex items-center gap-4 rounded-2xl border-2 border-white bg-gradient-to-br from-[#f0fdfa] to-white p-5 shadow-md shadow-cyan-100/50 transition hover:border-cyan-200 hover:shadow-lg animate-slide-in-right stagger-${(idx % 5) + 1}`}
+                >
+                  <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-cyan-600 to-cyan-800 text-xl font-black text-white shadow-inner">
+                    {(a.papa?.nombre ?? 'P').charAt(0)}
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="whitespace-normal break-words text-lg font-extrabold leading-tight text-[#111827]">
+                      {a.papa?.nombre ?? 'Papá'}
+                    </p>
+                    <span className="mt-1 inline-block rounded-lg bg-cyan-50 px-2.5 py-1 text-[11px] font-extrabold uppercase tracking-widest text-cyan-700">
                       {formatTiempoEnSala(a.horaEntrada)}
                     </span>
                     <p className="mt-1 text-xs font-semibold text-[#4b5563]">

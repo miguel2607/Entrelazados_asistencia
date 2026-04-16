@@ -17,6 +17,8 @@ public class NinoEntity {
     private LocalDate fechaNacimiento;
     @Column(name = "biometric_id")
     private String biometricId;
+    @Column(name = "grupo")
+    private String grupo;
 
     public Integer getId() { return id; }
     public void setId(Integer id) { this.id = id; }
@@ -28,4 +30,6 @@ public class NinoEntity {
     public void setFechaNacimiento(LocalDate f) { this.fechaNacimiento = f; }
     public String getBiometricId() { return biometricId; }
     public void setBiometricId(String biometricId) { this.biometricId = biometricId; }
+    public String getGrupo() { return grupo; }
+    public void setGrupo(String grupo) { this.grupo = grupo; }
 }
