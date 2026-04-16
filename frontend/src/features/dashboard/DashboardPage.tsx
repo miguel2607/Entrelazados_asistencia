@@ -361,6 +361,16 @@ export function DashboardPage() {
               </p>
             )}
           </div>
+          <button
+            type="button"
+            onClick={fetchLiveData}
+            className="inline-flex items-center justify-center gap-2 rounded-xl border-2 border-orange-300 bg-gradient-to-r from-amber-400 to-orange-500 px-5 py-3 text-sm font-extrabold uppercase tracking-widest text-white shadow-sm transition hover:from-amber-500 hover:to-orange-600"
+          >
+            <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+            </svg>
+            Actualizar ahora
+          </button>
           <div className="flex shrink-0 flex-col items-stretch gap-3 sm:flex-row sm:items-center lg:flex-col lg:items-end">
             <div className="rounded-2xl border border-indigo-100 bg-white/90 px-6 py-4 text-center shadow-sm backdrop-blur-sm">
               <p className="text-[11px] font-extrabold uppercase tracking-widest text-[#6b7280]">Total adentro</p>
@@ -368,19 +378,8 @@ export function DashboardPage() {
                 {liveAsistencia.length}
               </p>
             </div>
-            <button
-              type="button"
-              onClick={fetchLiveData}
-              className="inline-flex items-center justify-center gap-2 rounded-xl border-2 border-orange-300 bg-gradient-to-r from-amber-400 to-orange-500 px-5 py-3 text-sm font-extrabold uppercase tracking-widest text-white shadow-sm transition hover:from-amber-500 hover:to-orange-600"
-            >
-              <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-              </svg>
-              Actualizar ahora
-            </button>
           </div>
         </div>
-
         <div className="relative mt-8 min-h-[640px] rounded-2xl border border-indigo-100 bg-white/60 p-4 backdrop-blur-sm sm:p-6">
           {liveAsistencia.length === 0 ? (
             <div className="flex min-h-[200px] flex-col items-center justify-center gap-3 py-10 text-center text-[#9ca3af]">
