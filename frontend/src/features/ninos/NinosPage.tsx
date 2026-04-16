@@ -11,11 +11,10 @@ interface Nino {
   ti: string;
   fechaNacimiento: string;
   biometricId?: string;
-  grupo?: string;
 }
 
 // Wizard state types
-type Step1Form = { nombre: string; ti: string; fechaNacimiento: string; biometricId: string; grupo: string };
+type Step1Form = { nombre: string; ti: string; fechaNacimiento: string; biometricId: string };
 type Step2Form = { nombre: string; cc: string; telefono: string; parentesco: string };
 type WizardStep = 1 | 2;
 
@@ -26,7 +25,7 @@ export function NinosPage() {
   const [buscar, setBuscar] = useState('');
   const [modalOpen, setModalOpen] = useState(false);
   const [step, setStep] = useState<WizardStep>(1);
-  const [step1, setStep1] = useState<Step1Form>({ nombre: '', ti: '', fechaNacimiento: '', biometricId: '', grupo: '' });
+  const [step1, setStep1] = useState<Step1Form>({ nombre: '', ti: '', fechaNacimiento: '', biometricId: '' });
   const [step2, setStep2] = useState<Step2Form>({ nombre: '', cc: '', telefono: '', parentesco: '' });
   const [editingId, setEditingId] = useState<number | null>(null);
   const [saving, setSaving] = useState(false);
@@ -76,7 +75,7 @@ export function NinosPage() {
 
   const resetWizard = () => {
     setStep(1);
-    setStep1({ nombre: '', ti: '', fechaNacimiento: '', biometricId: '', grupo: '' });
+    setStep1({ nombre: '', ti: '', fechaNacimiento: '', biometricId: '' });
     setStep2({ nombre: '', cc: '', telefono: '', parentesco: '' });
     setCreatedNinoId(null);
     setSimilarNinos([]);
@@ -123,8 +122,7 @@ export function NinosPage() {
       nombre: n.nombre, 
       ti: n.ti ?? '', 
       fechaNacimiento: n.fechaNacimiento?.slice(0, 10) ?? '',
-      biometricId: n.biometricId ?? '',
-      grupo: n.grupo ?? ''
+      biometricId: n.biometricId ?? ''
     });
     setStep2({ nombre: '', cc: '', telefono: '', parentesco: '' });
     setStep(1);
@@ -147,8 +145,7 @@ export function NinosPage() {
         nombre: step1.nombre, 
         ti: step1.ti || undefined, 
         fechaNacimiento: step1.fechaNacimiento,
-        biometricId: step1.biometricId || undefined,
-        grupo: step1.grupo || undefined
+        biometricId: step1.biometricId || undefined
       };
       if (editingId) {
         await api.put<Nino>(`/ninos/${editingId}`, body);
@@ -266,7 +263,6 @@ export function NinosPage() {
                   <span className="text-[#4b5563] font-medium">{n.fechaNacimiento?.slice(0, 10)}</span>
                 )
               },
-              { key: 'grupo', header: 'Grupo', render: (n) => n.grupo || '-' },
               {
                 key: 'id', header: 'Acciones', render: (n) => (
                   <div className="flex gap-4">
@@ -355,26 +351,10 @@ export function NinosPage() {
                 />
               </div>
             </div>
-            <div className="space-y-1.5">
-              <label htmlFor="nino-grupo" className="block text-[11px] font-extrabold text-[#4b5563] uppercase tracking-widest">Grupo</label>
-              <select
-                id="nino-grupo"
-                required
-                value={step1.grupo}
-                onChange={(e) => setStep1((f) => ({ ...f, grupo: e.target.value }))}
-                className="w-full rounded-xl border border-[#e2e8f0] px-4 py-3 text-sm font-medium focus:border-[#2d1b69] focus:outline-none focus:ring-4 focus:ring-indigo-50 transition-all bg-white"
-              >
-                <option value="">Seleccionar grupo...</option>
-                <option value="APRENDER JUGANDO">APRENDER JUGANDO</option>
-                <option value="ESTIMULACION Y NURODESARROLLO">ESTIMULACION Y NURODESARROLLO</option>
-                <option value="CLASES EXTRACURRICULARES">CLASES EXTRACURRICULARES</option>
-              </select>
-            </div>
             {/* Campo ID Biométrico */}
             <div className="space-y-1.5">
-              <label htmlFor="nino-biometrico" className="block text-[11px] font-extrabold text-[#4b5563] uppercase tracking-widest">ID Biométrico (Equipo Hikvision)</label>
+              <label className="block text-[11px] font-extrabold text-[#4b5563] uppercase tracking-widest">ID Biométrico (Equipo Hikvision)</label>
               <input
-                id="nino-biometrico"
                 value={step1.biometricId}
                 onChange={(e) => setStep1((f) => ({ ...f, biometricId: e.target.value }))}
                 className="w-full rounded-xl border border-[#e2e8f0] px-4 py-3 text-sm font-medium focus:border-[#2d1b69] focus:outline-none focus:ring-4 focus:ring-indigo-50 transition-all"
@@ -402,9 +382,8 @@ export function NinosPage() {
               ✅ Niño registrado exitosamente. Ahora puedes vincular un acudiente (opcional).
             </div>
             <div className="space-y-1.5">
-              <label htmlFor="acudiente-nombre" className="block text-[11px] font-extrabold text-[#4b5563] uppercase tracking-widest">Nombre del Acudiente</label>
+              <label className="block text-[11px] font-extrabold text-[#4b5563] uppercase tracking-widest">Nombre del Acudiente</label>
               <input
-                id="acudiente-nombre"
                 required
                 value={step2.nombre}
                 onChange={(e) => {

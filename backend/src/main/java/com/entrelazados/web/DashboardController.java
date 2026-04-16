@@ -2,14 +2,11 @@ package com.entrelazados.web;
 
 import com.entrelazados.domain.Asistencia;
 import com.entrelazados.domain.Nino;
-import com.entrelazados.domain.Papa;
 import com.entrelazados.persistence.entity.NinoPlanEntity;
 import com.entrelazados.service.AsistenciaService;
-import com.entrelazados.service.AsistenciaPapaService;
 import com.entrelazados.service.DashboardService;
 import com.entrelazados.service.NinoPlanService;
 import com.entrelazados.service.NinoService;
-import com.entrelazados.service.PapaService;
 import com.entrelazados.service.PaqueteService;
 import com.entrelazados.service.ServicioService;
 import com.entrelazados.persistence.repository.NinoPlanJpaRepository;
@@ -31,22 +28,18 @@ public class DashboardController {
 
     private final DashboardService dashboardService;
     private final AsistenciaService asistenciaService;
-    private final AsistenciaPapaService asistenciaPapaService;
     private final NinoService ninoService;
-    private final PapaService papaService;
     private final NinoPlanService ninoPlanService;
     private final ServicioService servicioService;
     private final PaqueteService paqueteService;
     private final NinoPlanJpaRepository ninoPlanRepo;
 
     public DashboardController(DashboardService dashboardService, AsistenciaService asistenciaService,
-            AsistenciaPapaService asistenciaPapaService, NinoService ninoService, PapaService papaService, NinoPlanService ninoPlanService, ServicioService servicioService,
+            NinoService ninoService, NinoPlanService ninoPlanService, ServicioService servicioService,
             PaqueteService paqueteService, NinoPlanJpaRepository ninoPlanRepo) {
         this.dashboardService = dashboardService;
         this.asistenciaService = asistenciaService;
-        this.asistenciaPapaService = asistenciaPapaService;
         this.ninoService = ninoService;
-        this.papaService = papaService;
         this.ninoPlanService = ninoPlanService;
         this.servicioService = servicioService;
         this.paqueteService = paqueteService;
@@ -119,24 +112,6 @@ public class DashboardController {
         List<Map<String, Object>> enSalaAhora = asistenciaHoy.stream()
                 .filter(a -> a.get("horaSalida") == null)
                 .toList();
-        List<Map<String, Object>> asistenciaPapasHoy = asistenciaPapaService.listarPorFecha(f).stream().map(a -> {
-            Map<String, Object> m = new HashMap<>();
-            m.put("id", a.id());
-            m.put("idPapa", a.idPapa());
-            m.put("idPlan", a.idPlan());
-            m.put("fecha", a.fecha().toString());
-            m.put("horaEntrada", a.horaEntrada() != null ? a.horaEntrada().toString() : null);
-            m.put("horaSalida", a.horaSalida() != null ? a.horaSalida().toString() : null);
-            m.put("observacion", a.observacion());
-            m.put("nombrePlan", a.nombrePlan());
-            Papa p = papaService.buscarPorId(a.idPapa());
-            m.put("papa", Map.of(
-                    "id", p.id(),
-                    "nombre", p.nombre(),
-                    "cedula", p.cedula()
-            ));
-            return m;
-        }).filter(a -> a.get("horaSalida") == null).toList();
 
         // Alertas por tiempo máximo de permanencia según "composición" del plan.
         // - Media jornada: > 5 horas
@@ -209,11 +184,8 @@ public class DashboardController {
         Map<String, Object> map = new HashMap<>();
         map.put("totalNinos", (int) dashboardService.totalNinos());
         map.put("totalAsistenciaHoy", asistenciaHoy.size());
-        map.put("totalPapas", (int) papaService.listar(null).size());
-        map.put("totalAsistenciaPapasHoy", asistenciaPapasHoy.size());
         map.put("totalPlanesActivosHoy", planesActivosHoy.size());
         map.put("asistenciaHoy", enSalaAhora);
-        map.put("asistenciaPapasHoy", asistenciaPapasHoy);
         map.put("planesActivosHoy", planesActivosHoy);
         map.put("alertasPlanes", alertasPlanes);
         map.put("alertasTiempo", alertasTiempo.stream().map(m -> {

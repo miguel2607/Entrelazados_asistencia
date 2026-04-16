@@ -1,3 +1,0 @@
-ALTER TABLE asistencia_papa ADD COLUMN IF NOT EXISTS jornada VARCHAR(10);
-ALTER TABLE asistencia_papa ADD COLUMN IF NOT EXISTS id_plan INTEGER;
-ALTER TABLE asistencia_papa ADD COLUMN IF NOT EXISTS nombre_plan VARCHAR(255);

@@ -1,2 +1,0 @@
-ALTER TABLE papa_plan ADD COLUMN IF NOT EXISTS precio_acordado NUMERIC(12,2);
-ALTER TABLE papa_plan ADD COLUMN IF NOT EXISTS porcentaje_descuento NUMERIC(5,2) DEFAULT 0;

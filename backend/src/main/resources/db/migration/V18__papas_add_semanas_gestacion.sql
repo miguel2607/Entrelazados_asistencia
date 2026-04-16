@@ -1,1 +1,0 @@
-ALTER TABLE papas ADD COLUMN IF NOT EXISTS semanas_gestacion INTEGER;
