@@ -110,6 +110,12 @@ public class NinoPlanController {
         return toResponse(p);
     }
 
+    @PatchMapping("/{id}/quitar-sesiones")
+    public Map<String, Object> quitarSesiones(@PathVariable Integer id, @RequestParam Integer cantidad) {
+        NinoPlan p = planService.quitarSesiones(id, cantidad);
+        return toResponse(p);
+    }
+
     @PostMapping("/{id}/congelar")
     public Map<String, Object> congelar(@PathVariable Integer id, @RequestParam Integer dias) {
         NinoPlan p = planService.congelarPlan(id, dias);

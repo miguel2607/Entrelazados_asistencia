@@ -149,6 +149,36 @@ public class NinoPlanService {
     }
 
     @Transactional
+    public NinoPlan quitarSesiones(Integer id, Integer cantidad) {
+        if (cantidad == null || cantidad <= 0) {
+            throw new com.entrelazados.web.ConflictoException("Cantidad inválida");
+        }
+
+        NinoPlanEntity e = repo.findById(id)
+                .orElseThrow(() -> new RecursoNoEncontradoException("Plan no encontrado"));
+
+        int sesConsumidas = e.getSesionesConsumidas() != null ? e.getSesionesConsumidas() : 0;
+        int sesTotalesActual = e.getTotalSesiones() != null ? e.getTotalSesiones() : 0;
+
+        int nuevoTotal = sesTotalesActual - cantidad;
+        // No se puede bajar por debajo de lo ya consumido.
+        if (nuevoTotal < sesConsumidas) {
+            nuevoTotal = sesConsumidas;
+        }
+
+        // Si no cambia, retornamos el plan actual.
+        if (nuevoTotal == sesTotalesActual) {
+            return toDomain(e);
+        }
+
+        e.setTotalSesiones(nuevoTotal);
+        if (e.getFechaInicio() != null) {
+            e.setFechaFin(e.getFechaInicio().plusDays(nuevoTotal - 1));
+        }
+        return toDomain(repo.save(e));
+    }
+
+    @Transactional
     public NinoPlan congelarPlan(Integer id, Integer dias) {
         NinoPlanEntity e = repo.findById(id).orElseThrow(() -> new RecursoNoEncontradoException("Plan no encontrado"));
         

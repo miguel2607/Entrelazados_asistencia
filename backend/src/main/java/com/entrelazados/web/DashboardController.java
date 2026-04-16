@@ -14,6 +14,8 @@ import com.entrelazados.domain.TipoPlan;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDate;
+import java.time.LocalTime;
+import java.time.Duration;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -110,6 +112,65 @@ public class DashboardController {
         List<Map<String, Object>> enSalaAhora = asistenciaHoy.stream()
                 .filter(a -> a.get("horaSalida") == null)
                 .toList();
+
+        // Alertas por tiempo máximo de permanencia según "composición" del plan.
+        // - Media jornada: > 5 horas
+        // - Jornada extendida: > 7 horas
+        List<Map<String, Object>> alertasTiempo = new ArrayList<>();
+        Map<String, Map<String, Object>> alertasTiempoIndex = new HashMap<>();
+        for (Asistencia a : asis) {
+            String nombrePlan = ninoPlanService.getNombrePlan(a.idPlan());
+            if (nombrePlan == null) continue;
+
+            String nombrePlanLower = nombrePlan.toLowerCase();
+            Integer umbralHoras = null;
+            String tipoComposicion = null;
+            if (nombrePlanLower.contains("media jornada")) {
+                umbralHoras = 5;
+                tipoComposicion = "media jornada";
+            } else if (nombrePlanLower.contains("jornada extendida") || nombrePlanLower.contains("extendida")) {
+                umbralHoras = 7;
+                tipoComposicion = "jornada extendida";
+            }
+            if (umbralHoras == null) continue;
+
+            LocalTime entrada = a.horaEntrada();
+            LocalTime salida = a.horaSalida() != null ? a.horaSalida() : LocalTime.now();
+            Duration dur = Duration.between(entrada, salida);
+            if (dur.isNegative()) dur = dur.plusHours(24);
+
+            long segundos = dur.getSeconds();
+            if (segundos < umbralHoras * 3600L) continue;
+
+            Nino n = ninoService.buscarPorId(a.idNino());
+            double durHoras = segundos / 3600.0;
+            String durStr;
+            long horas = segundos / 3600;
+            long minutos = (segundos % 3600) / 60;
+            long secs = segundos % 60;
+            durStr = horas > 0 ? String.format("%d h %02d m", horas, minutos) : String.format("%d min", minutos);
+
+            String key = a.idNino() + "_" + a.idPlan();
+            Map<String, Object> prev = alertasTiempoIndex.get(key);
+            if (prev == null || (long) prev.getOrDefault("segundos", 0L) < segundos) {
+                Map<String, Object> m = new HashMap<>();
+                m.put("idNino", a.idNino());
+                m.put("nombreNino", n.nombre());
+                m.put("idPlan", a.idPlan());
+                m.put("nombrePlan", nombrePlan);
+                m.put("tipoComposicion", tipoComposicion);
+                m.put("umbralHoras", umbralHoras);
+                m.put("duracion", durStr);
+                m.put("segundos", segundos);
+                m.put("mensaje",
+                        String.format("Atención: %s superó el tiempo máximo de %s. Lleva %s (umbral: %dh).",
+                                n.nombre(), tipoComposicion, durStr, umbralHoras));
+                alertasTiempoIndex.put(key, m);
+            }
+        }
+
+        alertasTiempo.addAll(alertasTiempoIndex.values());
+        alertasTiempo.sort((m1, m2) -> ((Long) m2.getOrDefault("segundos", 0L)).compareTo((Long) m1.getOrDefault("segundos", 0L)));
         List<Map<String, Object>> cumpleanosHoy = ninoService.listarCumpleanosEnFecha(f).stream().map(n -> {
             Map<String, Object> m = new HashMap<>();
             m.put("id", n.id());
@@ -127,6 +188,10 @@ public class DashboardController {
         map.put("asistenciaHoy", enSalaAhora);
         map.put("planesActivosHoy", planesActivosHoy);
         map.put("alertasPlanes", alertasPlanes);
+        map.put("alertasTiempo", alertasTiempo.stream().map(m -> {
+            m.remove("segundos");
+            return m;
+        }).toList());
         map.put("cumpleanosHoy", cumpleanosHoy);
         return map;
     }

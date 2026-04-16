@@ -39,6 +39,8 @@ export function AsistenciaPage() {
   const [nuevaAsistenciaNinoId, setNuevaAsistenciaNinoId] = useState<string>('');
   const [nuevaAsistenciaPlanId, setNuevaAsistenciaPlanId] = useState<string>('');
   const [nuevaAsistenciaServicioId, setNuevaAsistenciaServicioId] = useState<string>('');
+  // Hora de entrada opcional: si está vacía, el backend usa LocalTime.now()
+  const [nuevaAsistenciaHoraEntrada, setNuevaAsistenciaHoraEntrada] = useState<string>('');
   const [nuevaAsistenciaJornada, setNuevaAsistenciaJornada] = useState<string>(() => {
     const hour = new Date().getHours();
     return hour < 13 ? 'MAÑANA' : 'TARDE';
@@ -117,28 +119,30 @@ export function AsistenciaPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [nuevaAsistenciaPlanId]);
 
-  const buildParams = (idNino: number, idPlan: number | null, idServicio: number | null, jornada: string, obs: string) => {
+  const buildParams = (idNino: number, idPlan: number | null, idServicio: number | null, jornada: string, obs: string, horaEntrada?: string) => {
     const p = new URLSearchParams();
     p.set('idNino', String(idNino));
     p.set('fecha', fecha);
     if (idPlan != null) p.set('idPlan', String(idPlan));
     if (idServicio != null) p.set('idServicio', String(idServicio));
     if (jornada) p.set('jornada', jornada);
+    if (horaEntrada && horaEntrada.trim()) p.set('horaEntrada', horaEntrada.trim());
     const o = obs?.trim();
     if (o) p.set('observacion', o);
     return p.toString();
   };
 
-  const registrarEntrada = (idNino: number, idPlan: number | null, idServicio: number | null, jornada: string, obs: string) => {
+  const registrarEntrada = (idNino: number, idPlan: number | null, idServicio: number | null, jornada: string, obs: string, horaEntrada?: string) => {
     setSendingEntrada(true);
     return api
-      .post('/asistencia/entrada?' + buildParams(idNino, idPlan, idServicio, jornada, obs))
+      .post('/asistencia/entrada?' + buildParams(idNino, idPlan, idServicio, jornada, obs, horaEntrada))
       .then(() => {
         load();
         setNuevaAsistenciaNinoId('');
         setNuevaAsistenciaPlanId('');
         setNuevaAsistenciaServicioId('');
         setServiciosDePaquete([]);
+        setNuevaAsistenciaHoraEntrada('');
       })
       .catch((e) => setError(e.message))
       .finally(() => setSendingEntrada(false));
@@ -190,13 +194,20 @@ export function AsistenciaPage() {
         if (plan?.tipo === 'SERVICIO') {
             // Buscamos el detalle para obtener el idServicio
             api.get<{ idServicio?: number }>(`/planes/${idPlan}`).then(detail => {
-                registrarEntrada(Number(nuevaAsistenciaNinoId), idPlan, detail.idServicio || null, nuevaAsistenciaJornada, '');
+                    registrarEntrada(
+                      Number(nuevaAsistenciaNinoId),
+                      idPlan,
+                      detail.idServicio || null,
+                      nuevaAsistenciaJornada,
+                      '',
+                      nuevaAsistenciaHoraEntrada || undefined
+                    );
             });
             return;
         }
     }
 
-    registrarEntrada(Number(nuevaAsistenciaNinoId), idPlan, idServicio, nuevaAsistenciaJornada, '');
+    registrarEntrada(Number(nuevaAsistenciaNinoId), idPlan, idServicio, nuevaAsistenciaJornada, '', nuevaAsistenciaHoraEntrada || undefined);
   };
 
   const isToday = fecha === fechaLocalYYYYMMDD();
@@ -268,6 +279,19 @@ export function AsistenciaPage() {
                   <option value="MAÑANA">☀️ MAÑANA</option>
                   <option value="TARDE">🌙 TARDE</option>
                 </select>
+              </div>
+
+              <div className="flex-1 min-w-[170px]">
+                <input
+                  type="time"
+                  value={nuevaAsistenciaHoraEntrada}
+                  onChange={(e) => setNuevaAsistenciaHoraEntrada(e.target.value)}
+                  className="w-full rounded-xl border-2 border-[#f1f3f4] bg-white px-4 py-3 text-sm font-bold text-[#2d1b69] focus:border-[#2d1b69] focus:outline-none transition-all shadow-sm"
+                  step={1}
+                />
+                <p className="mt-2 text-[10px] font-black text-[#9ca3af] uppercase tracking-widest text-left">
+                  Hora entrada (opcional)
+                </p>
               </div>
               
               {serviciosDePaquete.length > 0 && (
@@ -403,12 +427,22 @@ export function AsistenciaPage() {
                     )}
 
                     {estaEnSala && (
-                      <button
-                        onClick={() => registrarSalida(a.idNino, a.idPlan, a.id)}
-                        className="w-full py-4 rounded-2xl bg-gradient-to-r from-amber-400 to-orange-500 text-white font-black text-xs uppercase tracking-widest hover:shadow-lg hover:shadow-orange-200 transition-all hover:-translate-y-0.5 active:scale-95"
-                      >
-                        Registrar Salida
-                      </button>
+                      <>
+                        <button
+                          onClick={() => registrarSalida(a.idNino, a.idPlan, a.id)}
+                          className="w-full py-4 rounded-2xl bg-gradient-to-r from-amber-400 to-orange-500 text-white font-black text-xs uppercase tracking-widest hover:shadow-lg hover:shadow-orange-200 transition-all hover:-translate-y-0.5 active:scale-95"
+                        >
+                          Registrar Salida
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => eliminarAsistencia(a.id)}
+                          className="w-full py-3 rounded-2xl bg-white border-2 border-amber-200 text-amber-700 font-black text-[11px] uppercase tracking-widest hover:bg-amber-50 transition-all active:scale-95"
+                          title="Anular entrada y devolver 1 sesión (si aplica)"
+                        >
+                          Anular entrada (devolver sesión)
+                        </button>
+                      </>
                     )}
                   </div>
                 </div>

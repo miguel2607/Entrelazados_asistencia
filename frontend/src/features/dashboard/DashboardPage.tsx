@@ -2,6 +2,7 @@ import { useEffect, useState, useCallback, useRef } from 'react';
 import { api } from '../../shared/api/apiClient';
 import { fechaLocalYYYYMMDD } from '../../shared/fechaLocal';
 import { Modal } from '../../shared/components/Modal';
+import { AsistenciaReportesSection } from './AsistenciaReportesSection';
 
 type AlertaPlan = {
   idPlan: number;
@@ -15,6 +16,17 @@ type AlertaPlan = {
   mensaje: string;
 };
 
+type AlertaTiempo = {
+  idNino: number;
+  idPlan: number | null;
+  nombreNino: string;
+  nombrePlan: string;
+  tipoComposicion: string;
+  umbralHoras: number;
+  duracion: string;
+  mensaje: string;
+};
+
 type DashboardResponse = {
   totalNinos: number;
   totalAsistenciaHoy: number;
@@ -22,6 +34,7 @@ type DashboardResponse = {
   asistenciaHoy: { id: number; idNino: number; horaEntrada?: string | null; nino: { nombre: string } }[];
   planesActivosHoy: { idNino?: number; nombreNino?: string; tipo: string; nombre: string; sesionesRestantes: number; servicios: { nombre: string }[] }[];
   alertasPlanes: AlertaPlan[];
+  alertasTiempo: AlertaTiempo[];
   cumpleanosHoy: { id: number; nombre: string; fechaNacimiento: string; edadCumplida: number; mensaje: string }[];
 };
 
@@ -325,15 +338,15 @@ export function DashboardPage() {
       </div>
 
       {/* EN SALA AHORA — bloque destacado a ancho completo */}
-      <section className="animate-fade-in stagger-4 relative overflow-hidden rounded-3xl border-2 border-cyan-100/80 bg-gradient-to-br from-white via-[#f8fdff] to-[#f0f9ff] p-6 shadow-xl shadow-cyan-100/40 sm:p-8 lg:p-10">
-        <div className="pointer-events-none absolute -right-20 -top-20 h-64 w-64 rounded-full bg-cyan-200/20 blur-3xl" />
+      <section className="animate-fade-in stagger-4 relative overflow-hidden rounded-3xl border-2 border-indigo-100/80 bg-gradient-to-br from-white via-[#f5f3ff] to-[#ede9fe] p-6 shadow-xl shadow-indigo-100/40 sm:p-8 lg:p-10">
+        <div className="pointer-events-none absolute -right-20 -top-20 h-64 w-64 rounded-full bg-[#4c1d95]/20 blur-3xl" />
         <div className="pointer-events-none absolute -bottom-16 -left-16 h-48 w-48 rounded-full bg-[#2d1b69]/10 blur-3xl" />
         <div className="relative flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between">
           <div className="space-y-2">
             <div className="flex flex-wrap items-center gap-3">
               <h3 className="text-2xl font-extrabold tracking-tight text-[#111827] sm:text-3xl">En sala ahora</h3>
-              <span className="inline-flex items-center gap-2 rounded-full border border-cyan-200 bg-cyan-50 px-3 py-1 text-[11px] font-extrabold uppercase tracking-widest text-[#0891b2]">
-                <span className="h-2 w-2 rounded-full bg-[#06b6d4] animate-ping" />
+              <span className="inline-flex items-center gap-2 rounded-full border border-indigo-200 bg-indigo-50 px-3 py-1 text-[11px] font-extrabold uppercase tracking-widest text-[#2d1b69]">
+                <span className="h-2 w-2 rounded-full bg-[#4c1d95] animate-ping" />
                 En vivo
               </span>
             </div>
@@ -348,16 +361,16 @@ export function DashboardPage() {
             )}
           </div>
           <div className="flex shrink-0 flex-col items-stretch gap-3 sm:flex-row sm:items-center lg:flex-col lg:items-end">
-            <div className="rounded-2xl border border-cyan-100 bg-white/90 px-6 py-4 text-center shadow-sm backdrop-blur-sm">
+            <div className="rounded-2xl border border-indigo-100 bg-white/90 px-6 py-4 text-center shadow-sm backdrop-blur-sm">
               <p className="text-[11px] font-extrabold uppercase tracking-widest text-[#6b7280]">Total adentro</p>
-              <p className="mt-1 text-5xl font-black tabular-nums leading-none text-[#06b6d4] sm:text-6xl">
+              <p className="mt-1 text-5xl font-black tabular-nums leading-none text-[#4c1d95] sm:text-6xl">
                 {liveAsistencia.length}
               </p>
             </div>
             <button
               type="button"
               onClick={fetchLiveData}
-              className="inline-flex items-center justify-center gap-2 rounded-xl border-2 border-cyan-200 bg-white px-5 py-3 text-sm font-extrabold uppercase tracking-widest text-[#0891b2] shadow-sm transition hover:border-cyan-300 hover:bg-cyan-50"
+              className="inline-flex items-center justify-center gap-2 rounded-xl border-2 border-indigo-200 bg-white px-5 py-3 text-sm font-extrabold uppercase tracking-widest text-[#2d1b69] shadow-sm transition hover:border-indigo-300 hover:bg-indigo-50"
             >
               <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
@@ -367,7 +380,7 @@ export function DashboardPage() {
           </div>
         </div>
 
-        <div className="relative mt-8 min-h-[640px] rounded-2xl border border-[#e0f2fe] bg-white/60 p-4 backdrop-blur-sm sm:p-6">
+        <div className="relative mt-8 min-h-[640px] rounded-2xl border border-indigo-100 bg-white/60 p-4 backdrop-blur-sm sm:p-6">
           {liveAsistencia.length === 0 ? (
             <div className="flex min-h-[200px] flex-col items-center justify-center gap-3 py-10 text-center text-[#9ca3af]">
               <svg className="h-16 w-16 text-[#e2e8f0]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -381,16 +394,16 @@ export function DashboardPage() {
               {asistenciaOrdenada.map((a, idx) => (
                 <li
                   key={a.id}
-                  className={`flex min-h-[96px] items-center gap-3 rounded-2xl border-2 border-white bg-gradient-to-br from-[#f0fdfa] to-white p-4 shadow-md shadow-cyan-100/50 transition hover:border-cyan-200 hover:shadow-lg animate-slide-in-right stagger-${(idx % 5) + 1}`}
+                  className={`flex min-h-[96px] items-center gap-3 rounded-2xl border-2 border-white bg-gradient-to-br from-[#f3e8ff] to-white p-4 shadow-md shadow-indigo-100/50 transition hover:border-indigo-200 hover:shadow-lg animate-slide-in-right stagger-${(idx % 5) + 1}`}
                 >
-                  <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-[#06b6d4] to-[#2d1b69] text-xl font-black text-white shadow-inner">
+                  <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-[#4c1d95] to-[#2d1b69] text-xl font-black text-white shadow-inner">
                     {(a.nino?.nombre ?? 'E').charAt(0)}
                   </div>
                   <div className="min-w-0 flex-1">
                     <p className="whitespace-normal break-words text-lg font-extrabold leading-tight text-[#111827]">
                       {a.nino?.nombre ?? 'Estudiante'}
                     </p>
-                    <span className="mt-1 inline-block rounded-lg bg-cyan-100 px-2.5 py-1 text-[11px] font-extrabold uppercase tracking-widest text-[#0e7490]">
+                    <span className="mt-1 inline-block rounded-lg bg-indigo-50 px-2.5 py-1 text-[11px] font-extrabold uppercase tracking-widest text-[#4c1d95]">
                       {formatTiempoEnSala(a.horaEntrada)}
                     </span>
                     <p className="mt-1 text-xs font-semibold text-[#4b5563]">
@@ -403,6 +416,9 @@ export function DashboardPage() {
           )}
         </div>
       </section>
+
+      {/* INFORMES DE ASISTENCIA */}
+      <AsistenciaReportesSection />
 
       <div className="google-card animate-fade-in stagger-5">
         <h3 className="text-xs font-bold text-[#4b5563] uppercase tracking-widest mb-8">Flujo de Actividad</h3>
@@ -499,6 +515,45 @@ export function DashboardPage() {
                   >
                     <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" /></svg>
                   </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {(data.alertasTiempo?.length ?? 0) > 0 && (
+        <div className="rounded-2xl border border-amber-100 bg-amber-50/60 p-6 shadow-sm animate-scale-in stagger-5">
+          <div className="flex items-center gap-3 mb-6">
+            <div className="h-8 w-8 rounded-lg bg-amber-100 flex items-center justify-center text-amber-700">
+              <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+            </div>
+            <h3 className="text-sm font-bold text-amber-800 uppercase tracking-widest">
+              Tiempo Excedido
+            </h3>
+          </div>
+          <div className="space-y-3">
+            {data.alertasTiempo.map((a, idx) => (
+              <div
+                key={`${a.idNino}-${a.idPlan ?? 'null'}-${idx}`}
+                className={`flex flex-wrap items-center justify-between gap-4 rounded-xl bg-white border border-amber-100 px-5 py-4 shadow-sm hover:border-amber-300 transition-colors animate-slide-in-right stagger-${(idx % 5) + 1}`}
+              >
+                <div className="flex items-center gap-4">
+                  <div className="h-8 w-8 rounded-full bg-amber-50 flex items-center justify-center text-amber-700 font-bold text-xs ring-2 ring-white">
+                    {a.nombreNino.charAt(0)}
+                  </div>
+                  <div>
+                    <p className="text-sm font-bold text-[#111827]">{a.nombreNino}</p>
+                    <p className="text-[10px] text-[#4b5563] font-medium uppercase tracking-tighter">
+                      {a.nombrePlan}
+                    </p>
+                  </div>
+                </div>
+                <div className="text-right">
+                  <p className="text-sm font-bold text-amber-700">{a.duracion} (umbral: {a.umbralHoras}h)</p>
+                  <p className="text-[10px] text-[#4b5563] font-bold uppercase tracking-widest">Revisar</p>
                 </div>
               </div>
             ))}

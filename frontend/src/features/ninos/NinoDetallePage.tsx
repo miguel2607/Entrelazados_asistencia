@@ -221,6 +221,18 @@ export function NinoDetallePage() {
     setAddSessionsModalOpen(true);
   };
 
+  const quitarUnaSesion = async (idPlan: number, diasRestantes: number) => {
+    if (diasRestantes <= 0) return;
+    const ok = window.confirm('¿Seguro que deseas quitar 1 sesión a este plan?');
+    if (!ok) return;
+    try {
+      await api.patch(`/planes/${idPlan}/quitar-sesiones?cantidad=1`, {});
+      window.location.reload();
+    } catch (err: any) {
+      alert('Error al quitar sesión: ' + (err?.message ?? String(err)));
+    }
+  };
+
   const confirmarAdicionSesiones = async () => {
     if (!selectedPlanId || sessionsToAdd <= 0) return;
     setIsSavingSessions(true);
@@ -516,6 +528,19 @@ export function NinoDetallePage() {
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M12 4v16m8-8H4" />
                       </svg>
                       Añadir Sesiones
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => quitarUnaSesion(e.id, e.diasRestantes)}
+                      disabled={e.diasRestantes <= 0}
+                      className="mt-3 w-full flex items-center justify-center gap-2 py-2 rounded-xl border-2 border-rose-200 text-rose-700 text-[10px] font-extrabold uppercase tracking-widest hover:bg-rose-50 hover:border-rose-300 transition-all disabled:opacity-50"
+                      title={e.diasRestantes <= 0 ? 'No hay sesiones libres para quitar' : 'Quitar 1 sesión'}
+                    >
+                      <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M19 12H5" />
+                      </svg>
+                      Quitar 1 Sesión
                     </button>
                   </div>
                 ))}

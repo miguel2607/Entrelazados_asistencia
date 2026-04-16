@@ -14,6 +14,7 @@ import java.time.Duration;
 import java.time.LocalDate;
 import java.time.LocalTime;
 import java.util.List;
+import java.util.Optional;
 
 @Service
 public class AsistenciaService {
@@ -58,6 +59,17 @@ public class AsistenciaService {
         // Validación: No permitir entrada si ya está adentro (sin salida)
         if (repo.findTopByIdNinoAndFechaAndHoraSalidaIsNullOrderByIdDesc(idNino, fecha).isPresent()) {
             throw new ConflictoException("El niño ya tiene una entrada activa registrada hoy. Debe registrar su salida primero.");
+        }
+
+        // Regla: No permitir una nueva entrada hasta 1 minuto después de la última salida registrada.
+        Optional<com.entrelazados.persistence.entity.AsistenciaEntity> ultimaSalida = repo
+                .findTopByIdNinoAndFechaAndHoraSalidaIsNotNullOrderByHoraSalidaDesc(idNino, fecha);
+        if (ultimaSalida.isPresent() && ultimaSalida.get().getHoraSalida() != null) {
+            long segundosDesdeSalida = Duration.between(ultimaSalida.get().getHoraSalida(), horaEntrada).getSeconds();
+            // Si por algún motivo horaEntrada cae antes en el reloj, también bloqueamos (menos de 60s).
+            if (segundosDesdeSalida < 60) {
+                throw new ConflictoException("La entrada solo se puede registrar despues de 1 minuto de la salida.");
+            }
         }
 
         // Validación: No permitir repetir la misma jornada si se especifica
@@ -138,6 +150,11 @@ public class AsistenciaService {
     @Transactional(readOnly = true)
     public List<Asistencia> listarPorFecha(LocalDate fecha) {
         return repo.findByFechaOrderByIdNinoAscIdAsc(fecha).stream().map(this::toDomain).toList();
+    }
+
+    @Transactional(readOnly = true)
+    public List<Asistencia> listarPorRango(LocalDate desde, LocalDate hasta) {
+        return repo.findByFechaBetweenOrderByFechaAscIdAsc(desde, hasta).stream().map(this::toDomain).toList();
     }
 
     @Transactional(readOnly = true)

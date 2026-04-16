@@ -77,6 +77,31 @@ public class AsistenciaController {
         }).collect(Collectors.toList());
     }
 
+    @GetMapping("/por-rango")
+    public List<Map<String, Object>> porRango(@RequestParam LocalDate desde, @RequestParam LocalDate hasta) {
+        return asistenciaService.listarPorRango(desde, hasta).stream().map(a -> {
+            Map<String, Object> m = toMap(a);
+            Nino n = ninoService.buscarPorId(a.idNino());
+            m.put("nombrePlan", ninoPlanService.getNombrePlan(a.idPlan()));
+            m.put("nino", Map.of(
+                    "id", n.id(),
+                    "nombre", n.nombre(),
+                    "ti", n.ti() != null ? n.ti() : "",
+                    "fechaNacimiento", n.fechaNacimiento().toString()
+            ));
+
+            // Nombre del servicio utilizado (cuando viene de un paquete con servicio
+            // específico)
+            if (a.idServicio() != null) {
+                String nombreServicio = servicioRepo.findById(a.idServicio())
+                        .map(s -> s.getNombre()).orElse(null);
+                m.put("nombreServicio", nombreServicio);
+            }
+
+            return m;
+        }).collect(Collectors.toList());
+    }
+
     @GetMapping("/historial")
     public List<Map<String, Object>> historial(@RequestParam Integer idNino,
             @RequestParam(required = false) LocalDate desde, @RequestParam(required = false) LocalDate hasta) {
