@@ -21,10 +21,13 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("dashboard")
 public class DashboardController {
+    private static final long RESUMEN_CACHE_TTL_MS = 5000;
 
     private final DashboardService dashboardService;
     private final AsistenciaService asistenciaService;
@@ -33,6 +36,9 @@ public class DashboardController {
     private final ServicioService servicioService;
     private final PaqueteService paqueteService;
     private final NinoPlanJpaRepository ninoPlanRepo;
+    private LocalDate cacheFecha;
+    private long cacheExpiraEnMs;
+    private Map<String, Object> cacheResumen;
 
     public DashboardController(DashboardService dashboardService, AsistenciaService asistenciaService,
             NinoService ninoService, NinoPlanService ninoPlanService, ServicioService servicioService,
@@ -47,9 +53,19 @@ public class DashboardController {
     }
 
     @GetMapping
-    public Map<String, Object> resumen(@RequestParam(required = false) LocalDate fecha) {
+    public synchronized Map<String, Object> resumen(@RequestParam(required = false) LocalDate fecha) {
         LocalDate f = fecha != null ? fecha : LocalDate.now();
+        long ahoraMs = System.currentTimeMillis();
+        if (cacheResumen != null && f.equals(cacheFecha) && ahoraMs < cacheExpiraEnMs) {
+            return cacheResumen;
+        }
         List<Asistencia> asis = asistenciaService.listarPorFecha(f);
+        Set<Integer> idsNinos = asis.stream().map(Asistencia::idNino).collect(Collectors.toSet());
+        idsNinos.addAll(ninoPlanRepo.findConSesionesDisponibles().stream().map(NinoPlanEntity::getIdNino).toList());
+        idsNinos.addAll(ninoPlanRepo.findPorAgotarse(3).stream().map(NinoPlanEntity::getIdNino).toList());
+        Map<Integer, Nino> ninosPorId = idsNinos.stream().collect(Collectors.toMap(id -> id, ninoService::buscarPorId));
+        Map<Integer, String> nombresPlanPorId = new HashMap<>();
+
         List<Map<String, Object>> asistenciaHoy = asis.stream().map(a -> {
             Map<String, Object> m = new HashMap<>();
             m.put("id", a.id());
@@ -59,20 +75,22 @@ public class DashboardController {
             m.put("horaEntrada", a.horaEntrada() != null ? a.horaEntrada().toString() : null);
             m.put("horaSalida", a.horaSalida() != null ? a.horaSalida().toString() : null);
             m.put("observacion", a.observacion());
-            m.put("nombrePlan", ninoPlanService.getNombrePlan(a.idPlan()));
-            Nino n = ninoService.buscarPorId(a.idNino());
+            String nombrePlan = nombresPlanPorId.computeIfAbsent(a.idPlan(), ninoPlanService::getNombrePlan);
+            m.put("nombrePlan", nombrePlan);
+            Nino n = ninosPorId.get(a.idNino());
             m.put("nino", Map.of("id", n.id(), "nombre", n.nombre(), "ti", n.ti() != null ? n.ti() : "",
                     "fechaNacimiento", n.fechaNacimiento().toString()));
             return m;
         }).toList();
-        List<Map<String, Object>> planesActivosHoy = ninoPlanRepo.findConSesionesDisponibles().stream().map(plan -> {
+        List<NinoPlanEntity> planesConSesiones = ninoPlanRepo.findConSesionesDisponibles();
+        List<Map<String, Object>> planesActivosHoy = planesConSesiones.stream().map(plan -> {
             Map<String, Object> m = new HashMap<>();
             m.put("id", plan.getId());
             m.put("idNino", plan.getIdNino());
-            Nino n = ninoService.buscarPorId(plan.getIdNino());
+            Nino n = ninosPorId.get(plan.getIdNino());
             m.put("nombreNino", n.nombre());
             m.put("tipo", plan.getTipo().name());
-            m.put("nombre", ninoPlanService.getNombrePlan(plan.getId()));
+            m.put("nombre", nombresPlanPorId.computeIfAbsent(plan.getId(), ninoPlanService::getNombrePlan));
             m.put("sesionesRestantes", plan.getTotalSesiones() - plan.getSesionesConsumidas());
             if (plan.getTipo() == TipoPlan.SERVICIO && plan.getIdServicio() != null) {
                 var s = servicioService.buscarPorId(plan.getIdServicio());
@@ -96,11 +114,10 @@ public class DashboardController {
             Map<String, Object> al = new HashMap<>();
             al.put("idPlan", plan.getId());
             al.put("idNino", plan.getIdNino());
-            Nino n = ninoService.buscarPorId(plan.getIdNino());
+            Nino n = ninosPorId.get(plan.getIdNino());
             al.put("nombreNino", n.nombre());
-            al.put("nombrePlan",
-                    ninoPlanService.getNombrePlan(plan.getId()) != null ? ninoPlanService.getNombrePlan(plan.getId())
-                            : "Plan");
+            String nombrePlan = nombresPlanPorId.computeIfAbsent(plan.getId(), ninoPlanService::getNombrePlan);
+            al.put("nombrePlan", nombrePlan != null ? nombrePlan : "Plan");
             al.put("tipo", plan.getTipo().name());
             int restantes = plan.getTotalSesiones() - plan.getSesionesConsumidas();
             al.put("sesionesRestantes", restantes);
@@ -119,7 +136,7 @@ public class DashboardController {
         List<Map<String, Object>> alertasTiempo = new ArrayList<>();
         Map<String, Map<String, Object>> alertasTiempoIndex = new HashMap<>();
         for (Asistencia a : asis) {
-            String nombrePlan = ninoPlanService.getNombrePlan(a.idPlan());
+            String nombrePlan = nombresPlanPorId.computeIfAbsent(a.idPlan(), ninoPlanService::getNombrePlan);
             if (nombrePlan == null) continue;
 
             String nombrePlanLower = nombrePlan.toLowerCase();
@@ -142,12 +159,10 @@ public class DashboardController {
             long segundos = dur.getSeconds();
             if (segundos < umbralHoras * 3600L) continue;
 
-            Nino n = ninoService.buscarPorId(a.idNino());
-            double durHoras = segundos / 3600.0;
+            Nino n = ninosPorId.get(a.idNino());
             String durStr;
             long horas = segundos / 3600;
             long minutos = (segundos % 3600) / 60;
-            long secs = segundos % 60;
             durStr = horas > 0 ? String.format("%d h %02d m", horas, minutos) : String.format("%d min", minutos);
 
             String key = a.idNino() + "_" + a.idPlan();
@@ -193,6 +208,9 @@ public class DashboardController {
             return m;
         }).toList());
         map.put("cumpleanosHoy", cumpleanosHoy);
+        cacheFecha = f;
+        cacheExpiraEnMs = ahoraMs + RESUMEN_CACHE_TTL_MS;
+        cacheResumen = map;
         return map;
     }
 }

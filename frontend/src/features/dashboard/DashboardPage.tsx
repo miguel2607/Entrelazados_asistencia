@@ -39,11 +39,11 @@ type DashboardResponse = {
 };
 
 type NinoResumen = { id: number; nombre: string; biometricId?: string };
-type Step1Form = { nombre: string; ti: string; fechaNacimiento: string; biometricId: string };
+type Step1Form = { nombre: string; ti: string; fechaNacimiento: string; biometricId: string; grupo: string };
 type Step2Form = { nombre: string; cc: string; telefono: string; parentesco: string };
 
-/** Intervalo de actualización del listado en sala (dashboard completo; equilibrio entre “en vivo” y carga al servidor). */
-const LIVE_POLL_INTERVAL = 2000;
+/** Intervalo de actualización del dashboard para disminuir carga en Render. */
+const LIVE_POLL_INTERVAL = 10000;
 
 export function DashboardPage() {
   const [data, setData] = useState<DashboardResponse | null>(null);
@@ -59,7 +59,7 @@ export function DashboardPage() {
   // Wizard añadir niño
   const [wizardOpen, setWizardOpen] = useState(false);
   const [wizardStep, setWizardStep] = useState<1 | 2>(1);
-  const [step1, setStep1] = useState<Step1Form>({ nombre: '', ti: '', fechaNacimiento: '', biometricId: '' });
+  const [step1, setStep1] = useState<Step1Form>({ nombre: '', ti: '', fechaNacimiento: '', biometricId: '', grupo: '' });
   const [step2, setStep2] = useState<Step2Form>({ nombre: '', cc: '', telefono: '', parentesco: '' });
   const [wizardSaving, setWizardSaving] = useState(false);
   const [suggestingBiometricId, setSuggestingBiometricId] = useState(false);
@@ -121,7 +121,7 @@ export function DashboardPage() {
 
   const openWizard = () => {
     setWizardStep(1);
-    setStep1({ nombre: '', ti: '', fechaNacimiento: '', biometricId: '' });
+    setStep1({ nombre: '', ti: '', fechaNacimiento: '', biometricId: '', grupo: '' });
     setStep2({ nombre: '', cc: '', telefono: '', parentesco: '' });
     setWizardError(null);
     setCreatedNinoId(null);
@@ -143,6 +143,7 @@ export function DashboardPage() {
         ti: step1.ti || undefined,
         fechaNacimiento: step1.fechaNacimiento,
         biometricId: step1.biometricId || undefined,
+        grupo: step1.grupo || undefined,
       });
       setCreatedNinoId(nino.id);
       setWizardStep(2);
@@ -668,6 +669,20 @@ export function DashboardPage() {
                   className="w-full rounded-xl border border-[#e2e8f0] px-4 py-3 text-sm font-medium focus:border-[#2d1b69] focus:outline-none focus:ring-4 focus:ring-indigo-50 transition-all"
                 />
               </div>
+            </div>
+            <div className="space-y-1.5">
+              <label className="block text-[11px] font-extrabold text-[#4b5563] uppercase tracking-widest">Grupo</label>
+              <select
+                required
+                value={step1.grupo}
+                onChange={(e) => setStep1((f) => ({ ...f, grupo: e.target.value }))}
+                className="w-full rounded-xl border border-[#e2e8f0] px-4 py-3 text-sm font-medium focus:border-[#2d1b69] focus:outline-none focus:ring-4 focus:ring-indigo-50 transition-all bg-white"
+              >
+                <option value="">Seleccionar grupo...</option>
+                <option value="APRENDER JUGANDO">APRENDER JUGANDO</option>
+                <option value="ESTIMULACION Y NURODESARROLLO">ESTIMULACION Y NURODESARROLLO</option>
+                <option value="CLASES EXTRACURRICULARES">CLASES EXTRACURRICULARES</option>
+              </select>
             </div>
             <div className="space-y-1.5">
               <label className="block text-[11px] font-extrabold text-[#4b5563] uppercase tracking-widest">ID Biométrico (Equipo Hikvision)</label>

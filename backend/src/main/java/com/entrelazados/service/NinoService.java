@@ -35,24 +35,26 @@ public class NinoService {
     }
 
     @Transactional
-    public Nino crear(String nombre, String ti, LocalDate fechaNacimiento, String biometricId) {
+    public Nino crear(String nombre, String ti, LocalDate fechaNacimiento, String biometricId, String grupo) {
         NinoEntity e = new NinoEntity();
         e.setNombre(nombre);
         e.setTi(ti);
         e.setFechaNacimiento(fechaNacimiento);
         e.setBiometricId(biometricId);
+        e.setGrupo(grupo);
         e = repo.save(e);
         hikvisionService.sincronizarNino(e);
         return toDomain(e);
     }
 
     @Transactional
-    public Nino actualizar(Integer id, String nombre, String ti, LocalDate fechaNacimiento, String biometricId) {
+    public Nino actualizar(Integer id, String nombre, String ti, LocalDate fechaNacimiento, String biometricId, String grupo) {
         NinoEntity e = repo.findById(id).orElseThrow(() -> new RecursoNoEncontradoException("Niño no encontrado"));
         e.setNombre(nombre);
         e.setTi(ti);
         e.setFechaNacimiento(fechaNacimiento);
         e.setBiometricId(biometricId);
+        e.setGrupo(grupo);
         NinoEntity saved = repo.save(e);
         hikvisionService.sincronizarNino(saved);
         return toDomain(saved);
@@ -94,6 +96,6 @@ public class NinoService {
     }
 
     Nino toDomain(NinoEntity e) {
-        return new Nino(e.getId(), e.getNombre(), e.getTi(), e.getFechaNacimiento(), e.getBiometricId());
+        return new Nino(e.getId(), e.getNombre(), e.getTi(), e.getFechaNacimiento(), e.getBiometricId(), e.getGrupo());
     }
 }

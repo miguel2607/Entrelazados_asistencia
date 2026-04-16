@@ -5,4 +5,4 @@ import jakarta.validation.constraints.NotNull;
 
 import java.time.LocalDate;
 
-public record NinoRequest(@NotBlank String nombre, String ti, @NotNull LocalDate fechaNacimiento, String biometricId) {}
+public record NinoRequest(@NotBlank String nombre, String ti, @NotNull LocalDate fechaNacimiento, String biometricId, String grupo) {}
