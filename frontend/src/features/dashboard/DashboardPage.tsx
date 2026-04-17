@@ -44,38 +44,17 @@ type Step2Form = { nombre: string; cc: string; telefono: string; parentesco: str
 
 /** Intervalo de actualización del dashboard para disminuir carga en Render. */
 const LIVE_POLL_INTERVAL = 10000;
-const DASHBOARD_CACHE_KEY = 'dashboard-cache-v1';
-
-function readDashboardCache(): DashboardResponse | null {
-  try {
-    const raw = globalThis.sessionStorage.getItem(DASHBOARD_CACHE_KEY);
-    if (!raw) return null;
-    return JSON.parse(raw) as DashboardResponse;
-  } catch {
-    return null;
-  }
-}
-
-function writeDashboardCache(data: DashboardResponse) {
-  try {
-    globalThis.sessionStorage.setItem(DASHBOARD_CACHE_KEY, JSON.stringify(data));
-  } catch {
-    // Ignorar errores de almacenamiento (modo privado/capacidad).
-  }
-}
 
 export function DashboardPage() {
-  const [initialHasCache] = useState(() => readDashboardCache() != null);
-  const [data, setData] = useState<DashboardResponse | null>(() => readDashboardCache());
-  const [loading, setLoading] = useState(() => !readDashboardCache());
+  const [data, setData] = useState<DashboardResponse | null>(null);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   // Live update state for "En Sala Ahora"
-  const [liveAsistencia, setLiveAsistencia] = useState<DashboardResponse['asistenciaHoy']>(() => readDashboardCache()?.asistenciaHoy ?? []);
+  const [liveAsistencia, setLiveAsistencia] = useState<DashboardResponse['asistenciaHoy']>([]);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
   const [clockNow, setClockNow] = useState<Date>(new Date());
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const dashboardRequestInFlightRef = useRef(false);
 
   // Wizard añadir niño
   const [wizardOpen, setWizardOpen] = useState(false);
@@ -205,37 +184,35 @@ export function DashboardPage() {
     api.get<DashboardResponse>('/dashboard', { fecha: fechaLocalYYYYMMDD() }).then(setData);
   };
 
-  const fetchDashboard = useCallback(async (opts?: { showLoader?: boolean }) => {
-    if (dashboardRequestInFlightRef.current) return;
-    dashboardRequestInFlightRef.current = true;
-    if (opts?.showLoader) setLoading(true);
-
-    try {
-      const newData = await api.get<DashboardResponse>('/dashboard', { fecha: fechaLocalYYYYMMDD() });
-      setLiveAsistencia(newData.asistenciaHoy);
-      setData(newData);
-      writeDashboardCache(newData);
-      setLastUpdated(new Date());
-      setError(null);
-    } catch (e: any) {
-      if (opts?.showLoader) setError(e?.message ?? 'No se pudo cargar el dashboard.');
-    } finally {
-      if (opts?.showLoader) setLoading(false);
-      dashboardRequestInFlightRef.current = false;
-    }
+  // Fetch live attendance data
+  const fetchLiveData = useCallback(() => {
+    api.get<DashboardResponse>('/dashboard', { fecha: fechaLocalYYYYMMDD() })
+      .then((newData) => {
+        setLiveAsistencia(newData.asistenciaHoy);
+        setData(newData);
+        setLastUpdated(new Date());
+      })
+      .catch(() => { /* silently fail for live updates */ });
   }, []);
 
   useEffect(() => {
-    fetchDashboard({ showLoader: !initialHasCache });
-  }, [fetchDashboard, initialHasCache]);
+    api.get<DashboardResponse>('/dashboard', { fecha: fechaLocalYYYYMMDD() })
+      .then((d) => {
+        setData(d);
+        setLiveAsistencia(d.asistenciaHoy);
+        setLastUpdated(new Date());
+      })
+      .catch((e) => setError(e.message))
+      .finally(() => setLoading(false));
+  }, []);
 
   // Live polling for "En Sala Ahora"
   useEffect(() => {
-    pollRef.current = setInterval(() => { fetchDashboard(); }, LIVE_POLL_INTERVAL);
+    pollRef.current = setInterval(fetchLiveData, LIVE_POLL_INTERVAL);
     return () => {
       if (pollRef.current) clearInterval(pollRef.current);
     };
-  }, [fetchDashboard]);
+  }, [fetchLiveData]);
 
   useEffect(() => {
     const clockRef = setInterval(() => setClockNow(new Date()), 1000);
@@ -379,13 +356,14 @@ export function DashboardPage() {
             </p>
             {lastUpdated && (
               <p className="text-sm font-semibold text-[#6b7280]">
-                Última actualización: {lastUpdated.toLocaleTimeString('es-CO')}
+                Última actualización:{' '}
+                <span className="font-mono text-[#111827]">{lastUpdated.toLocaleTimeString('es-CO')}</span>
               </p>
             )}
           </div>
           <button
             type="button"
-            onClick={() => { fetchDashboard(); }}
+            onClick={fetchLiveData}
             className="inline-flex items-center justify-center gap-2 rounded-xl border-2 border-orange-300 bg-gradient-to-r from-amber-400 to-orange-500 px-5 py-3 text-sm font-extrabold uppercase tracking-widest text-white shadow-sm transition hover:from-amber-500 hover:to-orange-600"
           >
             <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
