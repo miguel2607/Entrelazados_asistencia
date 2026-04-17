@@ -218,7 +218,7 @@ public class NinoPlanService {
     }
 
     @Transactional
-    public NinoPlan congelarPlan(Integer id, Integer dias) {
+    public NinoPlan congelarPlan(Integer id, Integer dias, String motivo) {
         NinoPlanEntity e = repo.findById(id).orElseThrow(() -> new RecursoNoEncontradoException("Plan no encontrado"));
         
         // 1. Extender fecha de fin sin aumentar sesiones
@@ -232,7 +232,8 @@ public class NinoPlanService {
         repo.save(e);
 
         // 2. Registrar en historial
-        NinoPlanCongelacionEntity c = new NinoPlanCongelacionEntity(id, LocalDate.now(), dias);
+        String motivoLimpio = motivo != null && !motivo.isBlank() ? motivo.trim() : null;
+        NinoPlanCongelacionEntity c = new NinoPlanCongelacionEntity(id, LocalDate.now(), dias, motivoLimpio);
         congelacionRepo.save(c);
 
         return toDomain(e);

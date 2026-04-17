@@ -20,12 +20,16 @@ public class NinoPlanCongelacionEntity {
     @Column(nullable = false)
     private Integer dias;
 
+    @Column(length = 500)
+    private String motivo;
+
     public NinoPlanCongelacionEntity() {}
 
-    public NinoPlanCongelacionEntity(Integer idNinoPlan, LocalDate fecha, Integer dias) {
+    public NinoPlanCongelacionEntity(Integer idNinoPlan, LocalDate fecha, Integer dias, String motivo) {
         this.idNinoPlan = idNinoPlan;
         this.fecha = fecha;
         this.dias = dias;
+        this.motivo = motivo;
     }
 
     public Integer getId() {
@@ -58,5 +62,13 @@ public class NinoPlanCongelacionEntity {
 
     public void setDias(Integer dias) {
         this.dias = dias;
+    }
+
+    public String getMotivo() {
+        return motivo;
+    }
+
+    public void setMotivo(String motivo) {
+        this.motivo = motivo;
     }
 }

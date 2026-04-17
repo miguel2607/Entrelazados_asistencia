@@ -115,8 +115,10 @@ public class NinoPlanController {
     }
 
     @PostMapping("/{id}/congelar")
-    public Map<String, Object> congelar(@PathVariable Integer id, @RequestParam Integer dias) {
-        NinoPlan p = planService.congelarPlan(id, dias);
+    public Map<String, Object> congelar(@PathVariable Integer id, @RequestParam Integer dias,
+            @RequestBody(required = false) Map<String, String> body) {
+        String motivo = body != null ? body.get("motivo") : null;
+        NinoPlan p = planService.congelarPlan(id, dias, motivo);
         return toResponse(p);
     }
 

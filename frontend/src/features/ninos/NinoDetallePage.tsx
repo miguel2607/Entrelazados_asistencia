@@ -51,6 +51,7 @@ interface PlanEstado {
   id: number;
   nombre: string;
   tipo: string;
+  fechaInicio: string;
   diasTotales: number;
   diasUsados: number;
   diasRestantes: number;
@@ -60,7 +61,7 @@ interface PlanEstado {
   finalizado: boolean;
   fechaTermino?: string;
   motivoTermino?: 'sesiones' | 'tiempo';
-  historialCongelaciones: { id: number; fecha: string; dias: number }[];
+  historialCongelaciones: { id: number; fecha: string; dias: number; motivo?: string | null }[];
 }
 
 export function NinoDetallePage() {
@@ -84,6 +85,10 @@ export function NinoDetallePage() {
 
   // Congelamiento
   const [isFreezing, setIsFreezing] = useState<number | null>(null);
+  const [freezeModalOpen, setFreezeModalOpen] = useState(false);
+  const [freezePlanId, setFreezePlanId] = useState<number | null>(null);
+  const [freezeDias, setFreezeDias] = useState<number>(7);
+  const [freezeMotivo, setFreezeMotivo] = useState('');
 
   const load = () => {
     if (!id) return;
@@ -131,7 +136,7 @@ export function NinoDetallePage() {
             const historyUrl = `/asistencia/historial?idNino=${ninoId}&desde=${plan.fechaInicio}${plan.fechaFin ? `&hasta=${plan.fechaFin}` : ''}`;
             return Promise.allSettled([
               api.get<AsistenciaRow[]>(historyUrl),
-              api.get<{ id: number; fecha: string; dias: number }[]>(`/planes/${plan.id}/congelaciones`)
+              api.get<{ id: number; fecha: string; dias: number; motivo?: string | null }[]>(`/planes/${plan.id}/congelaciones`)
             ])
               .then((results) => {
                 const historial = results[0].status === 'fulfilled' ? results[0].value : [];
@@ -176,6 +181,7 @@ export function NinoDetallePage() {
                   id: plan.id,
                   nombre,
                   tipo: plan.tipo,
+                  fechaInicio: plan.fechaInicio,
                   diasTotales,
                   diasUsados,
                   diasRestantes,
@@ -224,11 +230,11 @@ export function NinoDetallePage() {
 
   const quitarUnaSesion = async (idPlan: number, diasRestantes: number) => {
     if (diasRestantes <= 0) return;
-    const ok = window.confirm('¿Seguro que deseas quitar 1 sesión a este plan?');
+    const ok = globalThis.confirm('¿Seguro que deseas quitar 1 sesión a este plan?');
     if (!ok) return;
     try {
       await api.patch(`/planes/${idPlan}/quitar-sesiones?cantidad=1`, {});
-      window.location.reload();
+      globalThis.location.reload();
     } catch (err: any) {
       alert('Error al quitar sesión: ' + (err?.message ?? String(err)));
     }
@@ -241,7 +247,7 @@ export function NinoDetallePage() {
       await api.patch(`/planes/${selectedPlanId}/agregar-sesiones?cantidad=${sessionsToAdd}`, {});
       setAddSessionsModalOpen(false);
       // Recargar datos
-      window.location.reload(); 
+      globalThis.location.reload(); 
     } catch (err: any) {
       alert('Error al añadir sesiones: ' + err.message);
     } finally {
@@ -249,11 +255,22 @@ export function NinoDetallePage() {
     }
   };
 
-  const handleCongelar = async (idPlan: number, dias: number) => {
-    setIsFreezing(idPlan);
+  const abrirCongelarModal = (idPlan: number, dias: number) => {
+    setFreezePlanId(idPlan);
+    setFreezeDias(dias);
+    setFreezeMotivo('');
+    setFreezeModalOpen(true);
+  };
+
+  const confirmarCongelar = async () => {
+    if (!freezePlanId) return;
+    setIsFreezing(freezePlanId);
     try {
-      await api.post(`/planes/${idPlan}/congelar?dias=${dias}`, {});
-      window.location.reload();
+      await api.post(`/planes/${freezePlanId}/congelar?dias=${freezeDias}`, {
+        motivo: freezeMotivo.trim() || undefined,
+      });
+      setFreezeModalOpen(false);
+      globalThis.location.reload();
     } catch (err: any) {
       alert('Error al congelar: ' + err.message);
     } finally {
@@ -463,6 +480,9 @@ export function NinoDetallePage() {
                           {e.tipo} {e.finalizado ? '— FINALIZADO' : ''}
                         </p>
                         <h4 className="text-lg font-extrabold text-[#111827] leading-tight">{e.nombre}</h4>
+                        <p className="mt-1 text-[10px] font-bold text-[#4b5563] uppercase tracking-widest">
+                          Asignado: {new Date(e.fechaInicio + 'T00:00:00').toLocaleDateString('es-CO')}
+                        </p>
                         {e.finalizado && e.fechaTermino && (
                           <p className="mt-1 text-xs font-bold text-rose-700">
                             Terminó el {new Date(e.fechaTermino + 'T00:00:00').toLocaleDateString('es-CO', { day: 'numeric', month: 'long' })}
@@ -487,7 +507,7 @@ export function NinoDetallePage() {
                     
                     <div className="mt-5 grid grid-cols-2 gap-3 pb-4 border-b border-[#f1f3f4]">
                       <button
-                        onClick={() => handleCongelar(e.id, 7)}
+                        onClick={() => abrirCongelarModal(e.id, 7)}
                         disabled={isFreezing !== null}
                         className="flex items-center justify-center gap-2 py-2.5 rounded-xl border border-[#e2e8f0] bg-white text-[9px] font-extrabold text-[#k026d3] uppercase tracking-widest hover:bg-fuchsia-50 hover:border-[#c026d3] transition-all disabled:opacity-50"
                       >
@@ -497,7 +517,7 @@ export function NinoDetallePage() {
                         Congelar 7d
                       </button>
                       <button
-                        onClick={() => handleCongelar(e.id, 14)}
+                        onClick={() => abrirCongelarModal(e.id, 14)}
                         disabled={isFreezing !== null}
                         className="flex items-center justify-center gap-2 py-2.5 rounded-xl border border-[#e2e8f0] bg-white text-[9px] font-extrabold text-[#k026d3] uppercase tracking-widest hover:bg-fuchsia-50 hover:border-[#c026d3] transition-all disabled:opacity-50"
                       >
@@ -516,9 +536,14 @@ export function NinoDetallePage() {
                         </p>
                         <ul className="space-y-1.5">
                           {e.historialCongelaciones.map(c => (
-                            <li key={c.id} className="flex justify-between items-center text-[9px] font-bold text-fuchsia-900 border-l-2 border-fuchsia-200 pl-2">
-                              <span>{new Date(c.fecha + 'T00:00:00').toLocaleDateString('es-CO', { day: '2-digit', month: '2-digit' })}</span>
-                              <span className="bg-white px-1.5 py-0.5 rounded shadow-sm">+{c.dias} días</span>
+                            <li key={c.id} className="text-[9px] font-bold text-fuchsia-900 border-l-2 border-fuchsia-200 pl-2 py-1">
+                              <div className="flex justify-between items-center">
+                                <span>{new Date(c.fecha + 'T00:00:00').toLocaleDateString('es-CO', { day: '2-digit', month: '2-digit' })}</span>
+                                <span className="bg-white px-1.5 py-0.5 rounded shadow-sm">+{c.dias} días</span>
+                              </div>
+                              <p className="mt-1 text-[9px] font-medium text-fuchsia-700 normal-case tracking-normal">
+                                Nota: {c.motivo?.trim() ? c.motivo : 'Sin nota registrada'}
+                              </p>
                             </li>
                           ))}
                         </ul>
@@ -610,6 +635,49 @@ export function NinoDetallePage() {
             </button>
           </div>
         </form>
+      </Modal>
+
+      <Modal
+        open={freezeModalOpen}
+        onClose={() => setFreezeModalOpen(false)}
+        title="Congelar Plan"
+      >
+        <div className="space-y-5">
+          <p className="text-sm text-[#4b5563]">
+            Vas a congelar este plan por <span className="font-extrabold text-[#2d1b69]">{freezeDias} días</span>.
+          </p>
+          <div className="space-y-2">
+            <label htmlFor="freeze-motivo" className="block text-[11px] font-extrabold text-[#4b5563] uppercase tracking-widest">
+              Nota del congelamiento (opcional)
+            </label>
+            <textarea
+              id="freeze-motivo"
+              value={freezeMotivo}
+              onChange={(e) => setFreezeMotivo(e.target.value)}
+              rows={3}
+              maxLength={500}
+              placeholder="Ej: Viaje familiar, incapacidad médica, vacaciones..."
+              className="w-full rounded-xl border border-[#e2e8f0] px-4 py-3 text-sm font-medium focus:border-[#2d1b69] focus:outline-none focus:ring-4 focus:ring-indigo-50 transition-all shadow-sm resize-none"
+            />
+          </div>
+          <div className="flex justify-end gap-3 pt-4 border-t border-[#e2e8f0]">
+            <button
+              type="button"
+              onClick={() => setFreezeModalOpen(false)}
+              className="google-button-secondary"
+            >
+              Cancelar
+            </button>
+            <button
+              type="button"
+              onClick={confirmarCongelar}
+              disabled={isFreezing !== null}
+              className="google-button-primary disabled:opacity-50"
+            >
+              {isFreezing !== null ? 'Congelando...' : 'Confirmar congelación'}
+            </button>
+          </div>
+        </div>
       </Modal>
 
       {/* Modal Añadir Sesiones con Animación */}

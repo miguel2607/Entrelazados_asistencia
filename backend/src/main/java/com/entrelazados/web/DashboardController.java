@@ -139,7 +139,7 @@ public class DashboardController {
 
         // Alertas por tiempo máximo de permanencia según "composición" del plan.
         // - Media jornada: > 5 horas
-        // - Jornada extendida: > 7 horas
+        // - Jornada extendida: > 8 horas
         List<Map<String, Object>> alertasTiempo = new ArrayList<>();
         Map<String, Map<String, Object>> alertasTiempoIndex = new HashMap<>();
         for (Asistencia a : asis) {
@@ -153,7 +153,7 @@ public class DashboardController {
                 umbralHoras = 5;
                 tipoComposicion = "media jornada";
             } else if (nombrePlanLower.contains("jornada extendida") || nombrePlanLower.contains("extendida")) {
-                umbralHoras = 7;
+                umbralHoras = 8;
                 tipoComposicion = "jornada extendida";
             }
             if (umbralHoras == null) continue;
