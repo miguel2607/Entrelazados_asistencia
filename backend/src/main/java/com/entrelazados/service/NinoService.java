@@ -8,7 +8,11 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
+import java.util.Map;
 import java.util.List;
+import java.util.Set;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 @Service
 public class NinoService {
@@ -32,6 +36,16 @@ public class NinoService {
     @Transactional(readOnly = true)
     public Nino buscarPorId(Integer id) {
         return toDomain(repo.findById(id).orElseThrow(() -> new RecursoNoEncontradoException("Niño no encontrado")));
+    }
+
+    @Transactional(readOnly = true)
+    public Map<Integer, Nino> mapearPorIds(Set<Integer> ids) {
+        if (ids == null || ids.isEmpty()) {
+            return Map.of();
+        }
+        return repo.findAllById(ids).stream()
+                .map(this::toDomain)
+                .collect(Collectors.toMap(Nino::id, Function.identity()));
     }
 
     @Transactional
@@ -87,10 +101,7 @@ public class NinoService {
 
     @Transactional(readOnly = true)
     public List<Nino> listarCumpleanosEnFecha(LocalDate fecha) {
-        return repo.findAllByOrderByNombreAsc().stream()
-                .filter(n -> n.getFechaNacimiento() != null
-                        && n.getFechaNacimiento().getMonthValue() == fecha.getMonthValue()
-                        && n.getFechaNacimiento().getDayOfMonth() == fecha.getDayOfMonth())
+        return repo.findCumpleanosByMesAndDia(fecha.getMonthValue(), fecha.getDayOfMonth()).stream()
                 .map(this::toDomain)
                 .toList();
     }

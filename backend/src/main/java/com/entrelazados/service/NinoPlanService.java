@@ -14,6 +14,9 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 @Service
 public class NinoPlanService {
@@ -110,6 +113,42 @@ public class NinoPlanService {
                 return paqueteRepo.findById(plan.getIdPaquete()).map(p -> p.getNombre()).orElse(null);
             return null;
         }).orElse(null);
+    }
+
+    @Transactional(readOnly = true)
+    public Map<Integer, String> mapearNombresPorIds(Set<Integer> idsPlan) {
+        if (idsPlan == null || idsPlan.isEmpty()) {
+            return Map.of();
+        }
+
+        List<NinoPlanEntity> planes = repo.findAllById(idsPlan);
+        Set<Integer> idsServicio = planes.stream()
+                .filter(p -> p.getTipo() == TipoPlan.SERVICIO && p.getIdServicio() != null)
+                .map(NinoPlanEntity::getIdServicio)
+                .collect(Collectors.toSet());
+        Set<Integer> idsPaquete = planes.stream()
+                .filter(p -> p.getTipo() == TipoPlan.PAQUETE && p.getIdPaquete() != null)
+                .map(NinoPlanEntity::getIdPaquete)
+                .collect(Collectors.toSet());
+
+        Map<Integer, String> serviciosPorId = servicioRepo.findAllById(idsServicio).stream()
+                .collect(Collectors.toMap(s -> s.getId(), s -> s.getNombre()));
+        Map<Integer, String> paquetesPorId = paqueteRepo.findAllById(idsPaquete).stream()
+                .collect(Collectors.toMap(p -> p.getId(), p -> p.getNombre()));
+
+        return planes.stream().collect(Collectors.toMap(
+                NinoPlanEntity::getId,
+                p -> {
+                    if (p.getTipo() == TipoPlan.SERVICIO) {
+                        return serviciosPorId.getOrDefault(p.getIdServicio(), "Plan");
+                    }
+                    if (p.getTipo() == TipoPlan.PAQUETE) {
+                        return paquetesPorId.getOrDefault(p.getIdPaquete(), "Plan");
+                    }
+                    return "Plan";
+                },
+                (a, b) -> a
+        ));
     }
 
     @Transactional(readOnly = true)

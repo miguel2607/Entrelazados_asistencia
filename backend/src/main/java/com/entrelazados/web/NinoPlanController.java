@@ -17,6 +17,7 @@ import java.time.LocalDate;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 @RestController
@@ -56,23 +57,20 @@ public class NinoPlanController {
     @GetMapping("/activos-hoy")
     public List<Map<String, Object>> activosHoy(@RequestParam(required = false) LocalDate fecha) {
         LocalDate f = fecha != null ? fecha : LocalDate.now();
-        return planService.findVigentesEnFecha(f).stream().map(plan -> {
+        var planes = planService.findVigentesEnFecha(f);
+        Set<Integer> idsNino = planes.stream().map(p -> p.getIdNino()).collect(Collectors.toSet());
+        Set<Integer> idsPlan = planes.stream().map(p -> p.getId()).collect(Collectors.toSet());
+        Map<Integer, Nino> ninosPorId = ninoService.mapearPorIds(idsNino);
+        Map<Integer, String> nombresPlanPorId = planService.mapearNombresPorIds(idsPlan);
+
+        return planes.stream().map(plan -> {
             Map<String, Object> m = new HashMap<>();
             m.put("idNino", plan.getIdNino());
-            Nino n = ninoService.buscarPorId(plan.getIdNino());
-            m.put("nombreNino", n.nombre());
+            Nino n = ninosPorId.get(plan.getIdNino());
+            m.put("nombreNino", n != null ? n.nombre() : "Sin nombre");
             m.put("tipo", plan.getTipo().name());
-            m.put("nombre", planService.getNombrePlan(plan.getId()));
-            if (plan.getTipo() == com.entrelazados.domain.TipoPlan.SERVICIO && plan.getIdServicio() != null) {
-                Servicio s = servicioService.buscarPorId(plan.getIdServicio());
-                m.put("servicios", List.of(Map.of("id", s.id(), "nombre", s.nombre(), "precio", s.precio())));
-            } else if (plan.getTipo() == com.entrelazados.domain.TipoPlan.PAQUETE && plan.getIdPaquete() != null) {
-                var paq = paqueteService.buscarPorIdConServicios(plan.getIdPaquete());
-                m.put("servicios", paq.servicios().stream()
-                        .map(s -> Map.of("id", s.id(), "nombre", s.nombre(), "precio", s.precio())).toList());
-            } else {
-                m.put("servicios", List.of());
-            }
+            m.put("nombre", nombresPlanPorId.get(plan.getId()));
+            m.put("servicios", List.of());
             return m;
         }).collect(Collectors.toList());
     }

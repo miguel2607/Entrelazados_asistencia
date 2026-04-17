@@ -55,6 +55,7 @@ export function DashboardPage() {
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
   const [clockNow, setClockNow] = useState<Date>(new Date());
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const dashboardRequestInFlightRef = useRef(false);
 
   // Wizard añadir niño
   const [wizardOpen, setWizardOpen] = useState(false);
@@ -171,7 +172,7 @@ export function DashboardPage() {
         parentesco: step2.parentesco || 'Familiar',
       });
       closeWizard();
-      api.get<DashboardResponse>('/dashboard', { fecha: fechaLocalYYYYMMDD() }).then(setData);
+      fetchLiveData();
     } catch (err: any) {
       setWizardError(err.message);
     } finally {
@@ -181,30 +182,34 @@ export function DashboardPage() {
 
   const omitirAcudienteWizard = () => {
     closeWizard();
-    api.get<DashboardResponse>('/dashboard', { fecha: fechaLocalYYYYMMDD() }).then(setData);
+    fetchLiveData();
   };
 
   // Fetch live attendance data
-  const fetchLiveData = useCallback(() => {
+  const fetchLiveData = useCallback((opts?: { showLoader?: boolean; showError?: boolean }) => {
+    if (dashboardRequestInFlightRef.current) return;
+    dashboardRequestInFlightRef.current = true;
+    if (opts?.showLoader) setLoading(true);
+
     api.get<DashboardResponse>('/dashboard', { fecha: fechaLocalYYYYMMDD() })
       .then((newData) => {
         setLiveAsistencia(newData.asistenciaHoy);
         setData(newData);
         setLastUpdated(new Date());
+        setError(null);
       })
-      .catch(() => { /* silently fail for live updates */ });
+      .catch((e) => {
+        if (opts?.showError) setError(e?.message ?? 'No se pudo cargar el dashboard.');
+      })
+      .finally(() => {
+        if (opts?.showLoader) setLoading(false);
+        dashboardRequestInFlightRef.current = false;
+      });
   }, []);
 
   useEffect(() => {
-    api.get<DashboardResponse>('/dashboard', { fecha: fechaLocalYYYYMMDD() })
-      .then((d) => {
-        setData(d);
-        setLiveAsistencia(d.asistenciaHoy);
-        setLastUpdated(new Date());
-      })
-      .catch((e) => setError(e.message))
-      .finally(() => setLoading(false));
-  }, []);
+    fetchLiveData({ showLoader: true, showError: true });
+  }, [fetchLiveData]);
 
   // Live polling for "En Sala Ahora"
   useEffect(() => {
@@ -356,14 +361,13 @@ export function DashboardPage() {
             </p>
             {lastUpdated && (
               <p className="text-sm font-semibold text-[#6b7280]">
-                Última actualización:{' '}
-                <span className="font-mono text-[#111827]">{lastUpdated.toLocaleTimeString('es-CO')}</span>
+                Última actualización: {lastUpdated.toLocaleTimeString('es-CO')}
               </p>
             )}
           </div>
           <button
             type="button"
-            onClick={fetchLiveData}
+            onClick={() => fetchLiveData()}
             className="inline-flex items-center justify-center gap-2 rounded-xl border-2 border-orange-300 bg-gradient-to-r from-amber-400 to-orange-500 px-5 py-3 text-sm font-extrabold uppercase tracking-widest text-white shadow-sm transition hover:from-amber-500 hover:to-orange-600"
           >
             <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
