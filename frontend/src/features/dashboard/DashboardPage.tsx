@@ -44,10 +44,30 @@ type Step2Form = { nombre: string; cc: string; telefono: string; parentesco: str
 
 /** Intervalo de actualización del dashboard para disminuir carga en Render. */
 const LIVE_POLL_INTERVAL = 10000;
+const DASHBOARD_CACHE_KEY = 'dashboard-cache-v1';
+
+function readDashboardCache(): DashboardResponse | null {
+  try {
+    const raw = window.sessionStorage.getItem(DASHBOARD_CACHE_KEY);
+    if (!raw) return null;
+    return JSON.parse(raw) as DashboardResponse;
+  } catch {
+    return null;
+  }
+}
+
+function writeDashboardCache(data: DashboardResponse) {
+  try {
+    window.sessionStorage.setItem(DASHBOARD_CACHE_KEY, JSON.stringify(data));
+  } catch {
+    // Ignorar errores de almacenamiento (modo privado/capacidad).
+  }
+}
 
 export function DashboardPage() {
-  const [data, setData] = useState<DashboardResponse | null>(null);
-  const [loading, setLoading] = useState(true);
+  const cachedData = readDashboardCache();
+  const [data, setData] = useState<DashboardResponse | null>(cachedData);
+  const [loading, setLoading] = useState(!cachedData);
   const [error, setError] = useState<string | null>(null);
 
   // Live update state for "En Sala Ahora"
@@ -190,21 +210,24 @@ export function DashboardPage() {
       .then((newData) => {
         setLiveAsistencia(newData.asistenciaHoy);
         setData(newData);
+        writeDashboardCache(newData);
         setLastUpdated(new Date());
       })
       .catch(() => { /* silently fail for live updates */ });
   }, []);
 
   useEffect(() => {
+    if (!cachedData) setLoading(true);
     api.get<DashboardResponse>('/dashboard', { fecha: fechaLocalYYYYMMDD() })
       .then((d) => {
         setData(d);
         setLiveAsistencia(d.asistenciaHoy);
+        writeDashboardCache(d);
         setLastUpdated(new Date());
       })
       .catch((e) => setError(e.message))
       .finally(() => setLoading(false));
-  }, []);
+  }, [cachedData]);
 
   // Live polling for "En Sala Ahora"
   useEffect(() => {
