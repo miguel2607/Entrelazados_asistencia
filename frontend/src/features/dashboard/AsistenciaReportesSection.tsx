@@ -1,8 +1,23 @@
 import { useMemo, useState } from 'react';
 import { api } from '../../shared/api/apiClient';
 import { fechaLocalYYYYMMDD } from '../../shared/fechaLocal';
-import jsPDF from 'jspdf';
-import autoTable from 'jspdf-autotable';
+
+type PdfTools = {
+  jsPDF: (typeof import('jspdf'))['default'];
+  autoTable: (typeof import('jspdf-autotable'))['default'];
+};
+
+let pdfToolsPromise: Promise<PdfTools> | null = null;
+
+function getPdfTools(): Promise<PdfTools> {
+  pdfToolsPromise ??= Promise.all([import('jspdf'), import('jspdf-autotable')]).then(
+    ([jspdfModule, autoTableModule]) => ({
+      jsPDF: jspdfModule.default,
+      autoTable: autoTableModule.default,
+    })
+  );
+  return pdfToolsPromise;
+}
 
 type NinoMini = { id?: number; nombre: string };
 
@@ -203,6 +218,7 @@ export function AsistenciaReportesSection() {
     setError(null);
     setLoadingDia(true);
     try {
+      const { jsPDF, autoTable } = await getPdfTools();
       const items = await api.get<ReportItem[]>('/asistencia/por-fecha', { fecha: dia });
       setDiaRows(items);
 
@@ -261,6 +277,7 @@ export function AsistenciaReportesSection() {
     setError(null);
     setLoadingMes(true);
     try {
+      const { jsPDF, autoTable } = await getPdfTools();
       const [yearStr, monthStr] = mes.split('-');
       const year = Number.parseInt(yearStr, 10);
       const month = Number.parseInt(monthStr, 10);
