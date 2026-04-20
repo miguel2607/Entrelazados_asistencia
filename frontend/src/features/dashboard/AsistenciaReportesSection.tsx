@@ -5,6 +5,7 @@ import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 
 type NinoMini = { id?: number; nombre: string };
+type PapaMini = { id?: number; nombre: string };
 
 type ReportItem = {
   id?: number;
@@ -14,8 +15,10 @@ type ReportItem = {
   nombrePlan?: string | null;
   nombreServicio?: string | null;
   nino?: NinoMini;
+  papa?: PapaMini;
   // Compatibilidad si un endpoint devolviera distinto nombre
   nombreNino?: string;
+  nombrePapa?: string;
 };
 
 function pad2(n: number) {
@@ -113,7 +116,9 @@ type MesGroup = {
   duracionTotalSegundos: number;
 };
 
-export function AsistenciaReportesSection() {
+type ReportesVariant = 'ninos' | 'padres';
+
+export function AsistenciaReportesSection({ variant = 'ninos' }: { variant?: ReportesVariant }) {
   const [loadingDia, setLoadingDia] = useState(false);
   const [loadingMes, setLoadingMes] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -126,6 +131,10 @@ export function AsistenciaReportesSection() {
 
   const [diaRows, setDiaRows] = useState<ReportItem[]>([]);
   const [mesRows, setMesRows] = useState<ReportItem[]>([]);
+
+  const nombreItem = (r: ReportItem) =>
+    variant === 'padres' ? (r.papa?.nombre ?? r.nombrePapa ?? '--') : (r.nino?.nombre ?? r.nombreNino ?? '--');
+  const planItem = (r: ReportItem) => r.nombrePlan ?? r.nombreServicio ?? 'Cortesía';
 
   const diaOrdenada = useMemo(() => {
     const copy = [...diaRows];
@@ -141,9 +150,12 @@ export function AsistenciaReportesSection() {
     const map = new Map<string, MesGroup>();
 
     for (const r of mesRows) {
-      const ninoId = r.nino?.id != null ? String(r.nino.id) : nombreItem(r);
+      const personaId =
+        variant === 'padres'
+          ? (r.papa?.id != null ? String(r.papa.id) : nombreItem(r))
+          : (r.nino?.id != null ? String(r.nino.id) : nombreItem(r));
       const plan = planItem(r);
-      const key = `${ninoId}__${plan}`;
+      const key = `${personaId}__${plan}`;
 
       const fecha = r.fecha ?? '';
       const entradaSec = parseTimeToSeconds(r.horaEntrada);
@@ -151,7 +163,7 @@ export function AsistenciaReportesSection() {
 
       if (!map.has(key)) {
         map.set(key, {
-          ninoKey: ninoId,
+          ninoKey: personaId,
           ninoNombre: nombreItem(r),
           planNombre: plan,
           veces: 0,
@@ -185,7 +197,7 @@ export function AsistenciaReportesSection() {
     const groups = Array.from(map.values());
     groups.sort((a, b) => b.veces - a.veces || a.ninoNombre.localeCompare(b.ninoNombre));
     return groups;
-  }, [mesRows]);
+  }, [mesRows, variant]);
 
   const formatDurationSegundos = (seg: number) => {
     const hours = Math.floor(seg / 3600);
@@ -196,14 +208,12 @@ export function AsistenciaReportesSection() {
     return `${seg}s`;
   };
 
-  const nombreItem = (r: ReportItem) => r.nino?.nombre ?? r.nombreNino ?? '--';
-  const planItem = (r: ReportItem) => r.nombrePlan ?? r.nombreServicio ?? 'Cortesía';
-
   async function descargarPDFDia() {
     setError(null);
     setLoadingDia(true);
     try {
-      const items = await api.get<ReportItem[]>('/asistencia/por-fecha', { fecha: dia });
+      const path = variant === 'padres' ? '/asistencia-papa/por-fecha' : '/asistencia/por-fecha';
+      const items = await api.get<ReportItem[]>(path, { fecha: dia });
       setDiaRows(items);
 
       const head = [['Nombre', 'Plan', 'Hora entrada', 'Hora salida', 'Duración']];
@@ -226,7 +236,7 @@ export function AsistenciaReportesSection() {
       doc.setFont('helvetica', 'bold');
       doc.setTextColor(45, 27, 105);
       doc.setFontSize(18);
-      doc.text('Reporte de Asistencia', 40, 30);
+      doc.text(variant === 'padres' ? 'Reporte de Asistencia (Padres)' : 'Reporte de Asistencia', 40, 30);
       doc.setTextColor(0, 0, 0);
       doc.setFontSize(10);
       doc.text(`Día: ${dia}`, 40, 48);
@@ -249,7 +259,9 @@ export function AsistenciaReportesSection() {
         columnStyles: { 0: { cellWidth: 'auto' } },
       });
 
-      doc.save(`reporte_asistencia_dia_${dia}.pdf`);
+      doc.save(
+        variant === 'padres' ? `reporte_asistencia_padres_dia_${dia}.pdf` : `reporte_asistencia_dia_${dia}.pdf`
+      );
     } catch (e: any) {
       setError(e?.message ?? 'Error generando el reporte del día.');
     } finally {
@@ -270,12 +282,19 @@ export function AsistenciaReportesSection() {
       const desde = toYYYYMMDD(desdeDate);
       const hasta = toYYYYMMDD(hastaDate);
 
-      const items = await api.get<ReportItem[]>('/asistencia/por-rango', { desde, hasta });
+      const path = variant === 'padres' ? '/asistencia-papa/por-rango' : '/asistencia/por-rango';
+      const items = await api.get<ReportItem[]>(path, { desde, hasta });
       setMesRows(items);
 
       const totalEntradas = items.length;
       const abierto = items.filter((r) => !r.horaSalida).length;
-      const ninosUnicos = new Set(items.map((r) => (r.nino?.id != null ? String(r.nino.id) : nombreItem(r)))).size;
+      const personasUnicas = new Set(
+        items.map((r) =>
+          variant === 'padres'
+            ? (r.papa?.id != null ? String(r.papa.id) : nombreItem(r))
+            : (r.nino?.id != null ? String(r.nino.id) : nombreItem(r))
+        )
+      ).size;
 
       const planCounts = new Map<string, number>();
       for (const r of items) {
@@ -290,16 +309,19 @@ export function AsistenciaReportesSection() {
       const grupos: MesGroup[] = [];
       const map = new Map<string, MesGroup>();
       for (const r of items) {
-        const ninoId = r.nino?.id != null ? String(r.nino.id) : nombreItem(r);
+        const personaId =
+          variant === 'padres'
+            ? (r.papa?.id != null ? String(r.papa.id) : nombreItem(r))
+            : (r.nino?.id != null ? String(r.nino.id) : nombreItem(r));
         const plan = planItem(r);
-        const key = `${ninoId}__${plan}`;
+        const key = `${personaId}__${plan}`;
         const fecha = r.fecha ?? '';
         const entradaSec = parseTimeToSeconds(r.horaEntrada);
         const entradaKey = entradaSec == null || !fecha ? null : `${fecha}-${entradaSec}`;
 
         if (!map.has(key)) {
           map.set(key, {
-            ninoKey: ninoId,
+            ninoKey: personaId,
             ninoNombre: nombreItem(r),
             planNombre: plan,
             veces: 0,
@@ -343,12 +365,12 @@ export function AsistenciaReportesSection() {
       doc.setFont('helvetica', 'bold');
       doc.setTextColor(45, 27, 105);
       doc.setFontSize(18);
-      doc.text('Reporte de Asistencia (Mes)', 40, 30);
+      doc.text(variant === 'padres' ? 'Reporte de Asistencia (Padres, Mes)' : 'Reporte de Asistencia (Mes)', 40, 30);
       doc.setTextColor(0, 0, 0);
       doc.setFontSize(10);
       doc.text(`Mes: ${mes}`, 40, 48);
       doc.text(`Entradas registradas: ${totalEntradas}`, 280, 48);
-      doc.text(`Niños únicos: ${ninosUnicos}`, 440, 48);
+      doc.text(variant === 'padres' ? `Padres únicos: ${personasUnicas}` : `Niños únicos: ${personasUnicas}`, 440, 48);
       doc.text(`Sin salida (abiertos): ${abierto}`, 600, 48);
       doc.setDrawColor(45, 27, 105);
       doc.setLineWidth(1);
@@ -369,7 +391,9 @@ export function AsistenciaReportesSection() {
         tableLineColor: [225, 220, 255],
       });
 
-      doc.save(`reporte_asistencia_mes_${mes}.pdf`);
+      doc.save(
+        variant === 'padres' ? `reporte_asistencia_padres_mes_${mes}.pdf` : `reporte_asistencia_mes_${mes}.pdf`
+      );
     } catch (e: any) {
       setError(e?.message ?? 'Error generando el reporte mensual.');
     } finally {
@@ -381,7 +405,9 @@ export function AsistenciaReportesSection() {
     <section className="rounded-3xl border border-indigo-100 bg-white/60 p-6 backdrop-blur-sm shadow-sm space-y-6">
       <div className="flex items-start justify-between gap-6 flex-col sm:flex-row sm:items-center">
         <div>
-          <h3 className="text-xl font-black text-[#111827]">Informes de Asistencia</h3>
+          <h3 className="text-xl font-black text-[#111827]">
+            {variant === 'padres' ? 'Informes de Asistencia (Padres)' : 'Informes de Asistencia'}
+          </h3>
           <p className="text-sm text-[#4b5563] mt-1">
             Reporte por día y mensual. Incluye nombre, plan, hora de entrada y duración.
           </p>
@@ -499,7 +525,8 @@ export function AsistenciaReportesSection() {
               </table>
               {mesAgrupado.length > 40 && (
                 <p className="text-xs text-[#6b7280] mt-2">
-                  Mostrando los primeros 40 grupos (niño + plan). El PDF incluye todos.
+                  Mostrando los primeros 40 grupos ({variant === 'padres' ? 'padre + plan' : 'niño + plan'}). El PDF
+                  incluye todos.
                 </p>
               )}
             </div>

@@ -263,6 +263,30 @@ export function DashboardPage() {
   }, []);
 
   const asistenciaOrdenada = [...liveAsistencia].sort((a, b) => segundosDelDia(a.horaEntrada) - segundosDelDia(b.horaEntrada));
+  const alertasCriticas = data
+    ? [
+        ...data.alertasPlanes.map((a) => ({
+          tipo: 'sesiones' as const,
+          key: `plan-${a.idPlan}`,
+          idPlan: a.idPlan,
+          nombreNino: a.nombreNino,
+          nombrePlan: a.nombrePlan,
+          mensaje: a.mensaje,
+          detalle: 'Atención requerida',
+          colorMensaje: a.vencido ? 'text-rose-600' : 'text-amber-600',
+        })),
+        ...data.alertasTiempo.map((a, idx) => ({
+          tipo: 'tiempo' as const,
+          key: `tiempo-${a.idNino}-${a.idPlan ?? 'null'}-${idx}`,
+          idPlan: null,
+          nombreNino: a.nombreNino,
+          nombrePlan: a.nombrePlan,
+          mensaje: `${a.duracion} (umbral: ${a.umbralHoras}h)`,
+          detalle: 'Exceso de tiempo',
+          colorMensaje: 'text-amber-700',
+        })),
+      ]
+    : [];
 
   const desestimarAlerta = (id: number) => {
     api.post(`/planes/${id}/desestimar-alerta`, {}).then(() => {
@@ -480,7 +504,7 @@ export function DashboardPage() {
         </div>
       </div>
 
-      {(data.alertasPlanes?.length ?? 0) > 0 && (
+      {alertasCriticas.length > 0 && (
         <div className="rounded-2xl border border-rose-100 bg-rose-50/50 p-6 shadow-sm animate-scale-in stagger-5">
           <div className="flex items-center gap-3 mb-6">
             <div className="h-8 w-8 rounded-lg bg-rose-100 flex items-center justify-center text-rose-600">
@@ -489,13 +513,13 @@ export function DashboardPage() {
               </svg>
             </div>
             <h3 className="text-sm font-bold text-rose-800 uppercase tracking-widest">
-              Sesiones por Agotarse
+              Alertas de Planes
             </h3>
           </div>
           <div className="space-y-3">
-            {data.alertasPlanes.map((a, idx) => (
+            {alertasCriticas.map((a, idx) => (
               <div
-                key={a.idPlan}
+                key={a.key}
                 className={`flex flex-wrap items-center justify-between gap-4 rounded-xl bg-white border border-rose-100 px-5 py-4 shadow-sm hover:border-rose-300 transition-colors animate-slide-in-right stagger-${(idx % 5) + 1}`}
               >
                 <div className="flex items-center gap-4">
@@ -509,55 +533,26 @@ export function DashboardPage() {
                 </div>
                 <div className="flex items-center gap-6">
                   <div className="text-right">
-                    <p className={`text-sm font-bold ${a.vencido ? 'text-rose-600' : 'text-amber-600'}`}>{a.mensaje}</p>
-                    <p className="text-[10px] text-[#4b5563] font-bold uppercase tracking-widest">Atención Requerida</p>
-                  </div>
-                  <button
-                    onClick={() => desestimarAlerta(a.idPlan)}
-                    className="h-8 w-8 rounded-lg hover:bg-rose-100 flex items-center justify-center text-rose-400 transition-colors"
-                    title="Desestimar por 24 horas"
-                  >
-                    <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" /></svg>
-                  </button>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {(data.alertasTiempo?.length ?? 0) > 0 && (
-        <div className="rounded-2xl border border-amber-100 bg-amber-50/60 p-6 shadow-sm animate-scale-in stagger-5">
-          <div className="flex items-center gap-3 mb-6">
-            <div className="h-8 w-8 rounded-lg bg-amber-100 flex items-center justify-center text-amber-700">
-              <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
-            </div>
-            <h3 className="text-sm font-bold text-amber-800 uppercase tracking-widest">
-              Tiempo Excedido
-            </h3>
-          </div>
-          <div className="space-y-3">
-            {data.alertasTiempo.map((a, idx) => (
-              <div
-                key={`${a.idNino}-${a.idPlan ?? 'null'}-${idx}`}
-                className={`flex flex-wrap items-center justify-between gap-4 rounded-xl bg-white border border-amber-100 px-5 py-4 shadow-sm hover:border-amber-300 transition-colors animate-slide-in-right stagger-${(idx % 5) + 1}`}
-              >
-                <div className="flex items-center gap-4">
-                  <div className="h-8 w-8 rounded-full bg-amber-50 flex items-center justify-center text-amber-700 font-bold text-xs ring-2 ring-white">
-                    {a.nombreNino.charAt(0)}
-                  </div>
-                  <div>
-                    <p className="text-sm font-bold text-[#111827]">{a.nombreNino}</p>
-                    <p className="text-[10px] text-[#4b5563] font-medium uppercase tracking-tighter">
-                      {a.nombrePlan}
+                    <p className={`text-sm font-bold ${a.colorMensaje}`}>{a.mensaje}</p>
+                    <p className="text-[10px] text-[#4b5563] font-bold uppercase tracking-widest">
+                      {a.tipo === 'sesiones' ? 'Por sesiones' : 'Por tiempo'}
                     </p>
                   </div>
-                </div>
-                <div className="text-right">
-                  <p className="text-sm font-bold text-amber-700">{a.duracion} (umbral: {a.umbralHoras}h)</p>
-                  <p className="text-[10px] text-[#4b5563] font-bold uppercase tracking-widest">Revisar</p>
+                  {a.tipo === 'sesiones' && a.idPlan != null ? (
+                    <button
+                      onClick={() => desestimarAlerta(a.idPlan)}
+                      className="h-8 w-8 rounded-lg hover:bg-rose-100 flex items-center justify-center text-rose-400 transition-colors"
+                      title="Desestimar por 24 horas"
+                    >
+                      <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" /></svg>
+                    </button>
+                  ) : (
+                    <div className="h-8 w-8 rounded-lg bg-amber-50 border border-amber-100 flex items-center justify-center text-amber-600">
+                      <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
+                    </div>
+                  )}
                 </div>
               </div>
             ))}

@@ -39,7 +39,8 @@ springdoc:
 app:
   jwt:
     secret: ${APP_JWT_SECRET:entrelazados2026SecretKeyForJWTSigningMustBe64CharsLongForHS256Algorithm!}
-    expirationMs: ${APP_JWT_EXPIRATIONMS:86400000}
+    # 30 días (~1 mes). Sobrescribible con APP_JWT_EXPIRATIONMS (milisegundos).
+    expirationMs: ${APP_JWT_EXPIRATIONMS:2592000000}
   cors:
     allowedOrigins: ${APP_CORS_ALLOWEDORIGINS:http://localhost:5173,http://localhost:5174}
   attendance:

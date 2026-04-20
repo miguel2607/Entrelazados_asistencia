@@ -38,6 +38,26 @@ const navItems = [
       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
     </svg>
   ) },
+  { to: '/padres', label: 'Panel padres', end: true, icon: (active: boolean) => (
+    <svg className={`h-5 w-5 ${active ? 'text-[#2d1b69]' : 'text-[#4b5563]'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
+    </svg>
+  ) },
+  { to: '/padres/gestion', label: 'Padres', icon: (active: boolean) => (
+    <svg className={`h-5 w-5 ${active ? 'text-[#2d1b69]' : 'text-[#4b5563]'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+    </svg>
+  ) },
+  { to: '/padres/asistencia', label: 'Asist. padres', icon: (active: boolean) => (
+    <svg className={`h-5 w-5 ${active ? 'text-[#2d1b69]' : 'text-[#4b5563]'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+    </svg>
+  ) },
+  { to: '/padres/planes', label: 'Planes padres', icon: (active: boolean) => (
+    <svg className={`h-5 w-5 ${active ? 'text-[#2d1b69]' : 'text-[#4b5563]'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" />
+    </svg>
+  ) },
 ];
 
 export function Layout() {
@@ -87,7 +107,7 @@ export function Layout() {
             <NavLink
               key={item.to}
               to={item.to}
-              end={item.end}
+              end={Boolean((item as { end?: boolean }).end)}
               className={({ isActive }) =>
                 [
                   `flex items-center rounded-xl py-3 text-sm font-semibold transition-all duration-300 animate-slide-in-right ${sidebarCollapsed ? 'justify-center px-2' : 'gap-3 px-4'}`,

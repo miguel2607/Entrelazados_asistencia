@@ -81,12 +81,19 @@ public class HikvisionService {
 
     /**
      * Sincroniza un niño con el equipo Hikvision.
-     * Si el usuario ya existe en el dispositivo (employeeNoAlreadyExist),
-     * se usa el endpoint de modificación (PUT /UserInfo/Modify) en lugar del de creación.
-     * En ambos casos se asignan los permisos de acceso al final.
      */
     public void sincronizarNino(NinoEntity nino) {
         if (nino.getBiometricId() == null || nino.getBiometricId().isEmpty()) {
+            return;
+        }
+        sincronizarEmpleado(nino.getBiometricId(), nino.getNombre());
+    }
+
+    /**
+     * Sincroniza cualquier usuario (niño, padre, etc.) por número de empleado biométrico.
+     */
+    public void sincronizarEmpleado(String biometricId, String nombreDisplay) {
+        if (biometricId == null || biometricId.isEmpty()) {
             return;
         }
         if (!syncEnabled) {
@@ -94,16 +101,19 @@ public class HikvisionService {
             return;
         }
 
-        String nombre = nino.getNombre();
+        String nombre = nombreDisplay;
         if (nombre != null && nombre.length() > 20) {
             nombre = nombre.substring(0, 20);
+        }
+        if (nombre == null) {
+            nombre = "";
         }
 
         String jsonBody = String.format(
             "{\"UserInfo\":{\"employeeNo\":\"%s\",\"name\":\"%s\",\"userType\":\"normal\"," +
             "\"checkUser\":%s,\"Valid\":{\"enable\":true,\"beginTime\":\"2010-01-01T00:00:00\"," +
             "\"endTime\":\"2036-03-31T23:59:59\",\"timeType\":\"local\"}}}",
-            nino.getBiometricId(), nombre, attendanceCheckOnly
+            biometricId, nombre, attendanceCheckOnly
         );
 
         HttpHeaders headers = new HttpHeaders();
@@ -112,23 +122,21 @@ public class HikvisionService {
         HttpEntity<String> entity = new HttpEntity<>(jsonBody, headers);
 
         try {
-            // Intento 1: Crear usuario nuevo (POST)
             String createUrl = String.format("http://%s/ISAPI/AccessControl/UserInfo/Record?format=json", deviceIp);
-            log.info("Creando usuario ID {} ({}) en Hikvision...", nino.getBiometricId(), nombre);
+            log.info("Creando usuario ID {} ({}) en Hikvision...", biometricId, nombre);
             var response = restTemplate.exchange(createUrl, HttpMethod.POST, entity, String.class);
             log.info("Usuario creado. Respuesta: {}", response.getBody());
 
         } catch (org.springframework.web.client.HttpClientErrorException e) {
             String responseBody = e.getResponseBodyAsString();
             if (responseBody.contains("employeeNoAlreadyExist")) {
-                // El usuario ya existe → actualizarlo con PUT
-                log.info("Usuario {} ya existe en el dispositivo. Actualizando con PUT...", nino.getBiometricId());
+                log.info("Usuario {} ya existe en el dispositivo. Actualizando con PUT...", biometricId);
                 try {
                     String updateUrl = String.format("http://%s/ISAPI/AccessControl/UserInfo/Modify?format=json", deviceIp);
                     restTemplate.exchange(updateUrl, HttpMethod.PUT, entity, String.class);
-                    log.info("Usuario {} actualizado correctamente.", nino.getBiometricId());
+                    log.info("Usuario {} actualizado correctamente.", biometricId);
                 } catch (Exception ex) {
-                    log.warn("No se pudo actualizar el usuario {} en el dispositivo: {}", nino.getBiometricId(), ex.getMessage());
+                    log.warn("No se pudo actualizar el usuario {} en el dispositivo: {}", biometricId, ex.getMessage());
                 }
             } else {
                 log.error("Error HTTP al sincronizar con Hikvision: {} — {}", e.getStatusCode(), responseBody);
@@ -137,8 +145,7 @@ public class HikvisionService {
             log.error("Error inesperado al sincronizar con Hikvision: {}", e.getMessage());
         }
 
-        // Siempre asignar permisos, sin importar si fue crear o actualizar
-        asignarPermisosAcceso(nino.getBiometricId());
+        asignarPermisosAcceso(biometricId);
     }
 
     /**
@@ -223,6 +230,11 @@ public class HikvisionService {
      * Elimina un niño del equipo Hikvision.
      */
     public void eliminarNino(String biometricId) {
+        eliminarEmpleado(biometricId);
+    }
+
+    /** Elimina un usuario del equipo por ID de empleado biométrico. */
+    public void eliminarEmpleado(String biometricId) {
         if (biometricId == null || biometricId.isEmpty())
             return;
         if (!syncEnabled) {
@@ -241,8 +253,7 @@ public class HikvisionService {
             root.put("UserInfoDetailList", java.util.List.of(detail));
 
             HttpEntity<Map<String, Object>> entity = new HttpEntity<>(root, getHeaders());
-            restTemplate.exchange(url, HttpMethod.PUT, entity, String.class); // Hikvision suele usar PUT para borrar
-                                                                              // masivamente con cuerpo
+            restTemplate.exchange(url, HttpMethod.PUT, entity, String.class);
         } catch (Exception e) {
             log.warn("No se pudo eliminar del equipo: {}", e.getMessage());
         }

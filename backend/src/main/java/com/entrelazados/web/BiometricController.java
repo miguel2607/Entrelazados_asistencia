@@ -1,6 +1,6 @@
 package com.entrelazados.web;
 
-import com.entrelazados.service.AsistenciaService;
+import com.entrelazados.service.BiometricRegistrarService;
 import jakarta.servlet.http.HttpServletRequest;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -16,10 +16,10 @@ import java.nio.charset.StandardCharsets;
 public class BiometricController {
 
     private static final Logger log = LoggerFactory.getLogger(BiometricController.class);
-    private final AsistenciaService asistenciaService;
+    private final BiometricRegistrarService biometricRegistrarService;
 
-    public BiometricController(AsistenciaService asistenciaService) {
-        this.asistenciaService = asistenciaService;
+    public BiometricController(BiometricRegistrarService biometricRegistrarService) {
+        this.biometricRegistrarService = biometricRegistrarService;
     }
 
     /**
@@ -76,7 +76,7 @@ public class BiometricController {
             String employeeId = extraerEmployeeId(body);
             if (employeeId != null && !employeeId.isBlank()) {
                 log.info("ID biométrico detectado: {}", employeeId);
-                asistenciaService.registrarAsistenciaBiometrica(employeeId);
+                biometricRegistrarService.registrarPorBiometricId(employeeId);
             } else {
                 log.debug("Evento sin employeeNoString/employeeNo, se ignora.");
             }

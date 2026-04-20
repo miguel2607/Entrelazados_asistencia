@@ -2,6 +2,13 @@
 const BASE = import.meta.env.VITE_API_BASE ?? 'http://localhost:8081/api/v1';
 const AUTH_KEY = 'entrelazados_auth';
 
+/** Sesión inválida/expirada: limpiar y volver al login (evita quedar “logueado” con token muerto). No aplica en la propia pantalla de login. */
+function handleUnauthorized() {
+  if (window.location.pathname === '/login') return;
+  localStorage.removeItem(AUTH_KEY);
+  window.location.assign('/login');
+}
+
 export interface ApiError {
   timestamp: string;
   status: number;
@@ -11,6 +18,9 @@ export interface ApiError {
 }
 
 async function handleResponse<T>(res: Response): Promise<T> {
+  if (res.status === 401) {
+    handleUnauthorized();
+  }
   const text = await res.text();
   if (!res.ok) {
     let err: ApiError;
@@ -63,6 +73,9 @@ export const api = {
     }).then(handleResponse<T>),
   delete: (path: string): Promise<void> =>
     fetch(BASE + path, { method: 'DELETE', headers: { ...authHeader() } }).then(async (r) => {
+      if (r.status === 401) {
+        handleUnauthorized();
+      }
       if (!r.ok) {
         const text = await r.text();
         let err: ApiError;
