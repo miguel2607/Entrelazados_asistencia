@@ -18,6 +18,7 @@ public class NinoEntity {
     @Column(name = "biometric_id")
     private String biometricId;
     private String grupo;
+    private String subgrupo;
 
     public Integer getId() { return id; }
     public void setId(Integer id) { this.id = id; }
@@ -31,4 +32,6 @@ public class NinoEntity {
     public void setBiometricId(String biometricId) { this.biometricId = biometricId; }
     public String getGrupo() { return grupo; }
     public void setGrupo(String grupo) { this.grupo = grupo; }
+    public String getSubgrupo() { return subgrupo; }
+    public void setSubgrupo(String subgrupo) { this.subgrupo = subgrupo; }
 }

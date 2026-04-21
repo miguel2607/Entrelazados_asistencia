@@ -17,4 +17,6 @@ public interface PapaJpaRepository extends JpaRepository<PapaEntity, Integer> {
     boolean existsByCedulaIgnoreCaseAndIdNot(String cedula, Integer id);
 
     boolean existsByCedulaIgnoreCase(String cedula);
+
+    boolean existsByGrupoIgnoreCase(String grupo);
 }

@@ -89,6 +89,7 @@ public class NinoController {
         map.put("fechaNacimiento", nino.fechaNacimiento().toString());
         map.put("biometricId", nino.biometricId());
         map.put("grupo", nino.grupo());
+        map.put("subgrupo", nino.subgrupo());
         map.put("acudientes", acudientes);
         map.put("planesActivos", planesActivos);
         map.put("asistenciaHoy", asistenciaHoy);
@@ -99,13 +100,13 @@ public class NinoController {
     @ResponseStatus(HttpStatus.CREATED)
     public Nino crear(@Valid @RequestBody NinoRequest request) {
         return ninoService.crear(request.nombre(), request.ti(), request.fechaNacimiento(), request.biometricId(),
-                request.grupo());
+                request.grupo(), request.subgrupo());
     }
 
     @PutMapping("/{id}")
     public Nino actualizar(@PathVariable Integer id, @Valid @RequestBody NinoRequest request) {
         return ninoService.actualizar(id, request.nombre(), request.ti(), request.fechaNacimiento(), request.biometricId(),
-                request.grupo());
+                request.grupo(), request.subgrupo());
     }
 
     @DeleteMapping("/{id}")

@@ -87,7 +87,9 @@ public class DashboardController {
             Nino n = ninosPorId.get(a.idNino());
             if (n != null) {
                 m.put("nino", Map.of("id", n.id(), "nombre", n.nombre(), "ti", n.ti() != null ? n.ti() : "",
-                        "fechaNacimiento", n.fechaNacimiento().toString()));
+                        "fechaNacimiento", n.fechaNacimiento().toString(),
+                        "grupo", n.grupo() != null ? n.grupo() : "",
+                        "subgrupo", n.subgrupo() != null ? n.subgrupo() : ""));
             }
             return m;
         }).toList();

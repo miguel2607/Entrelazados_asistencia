@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { api } from '../../shared/api/apiClient';
 import { Modal } from '../../shared/components/Modal';
+import { listarGrupos } from '../../shared/grupos';
 
 interface NinoDetalle {
   id: number;
@@ -10,6 +11,7 @@ interface NinoDetalle {
   fechaNacimiento: string;
   biometricId?: string;
   grupo?: string;
+  subgrupo?: string;
   acudientes: { id: number; nombre: string; telefono: string; parentesco: string }[];
   planesActivos: { tipo: string; nombre: string; servicios: { nombre: string }[] }[];
   asistenciaHoy: { horaEntrada: string; horaSalida: string } | null;
@@ -76,6 +78,7 @@ export function NinoDetallePage() {
   const [loadingEstado, setLoadingEstado] = useState(true);
   const [toDelete, setToDelete] = useState<number | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [grupoColorMap, setGrupoColorMap] = useState<Map<string, string>>(new Map());
 
   // Modal para añadir sesiones
   const [addSessionsModalOpen, setAddSessionsModalOpen] = useState(false);
@@ -104,6 +107,12 @@ export function NinoDetallePage() {
     load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
+
+  useEffect(() => {
+    listarGrupos()
+      .then((grupos) => setGrupoColorMap(new Map(grupos.map((g) => [g.nombre, g.color]))))
+      .catch(() => setGrupoColorMap(new Map()));
+  }, []);
 
   const diffDias = useCallback((desde: string, hasta: string | null) => {
     if (!hasta) return 30; // Valor por defecto si no hay fin (indefinido)
@@ -370,7 +379,21 @@ export function NinoDetallePage() {
               </div>
               <div className="p-4 rounded-2xl bg-[#fcfaff] border border-[#f3e8ff]">
                 <p className="text-[9px] text-[#2d1b69] font-extrabold uppercase tracking-widest mb-1">Grupo</p>
-                <p className="text-sm font-bold text-[#111827]">{data.grupo || 'No asignado'}</p>
+                {data.grupo ? (
+                  <div className="space-y-2">
+                    <p className="inline-flex items-center gap-2 rounded-full border border-[#e2e8f0] bg-white px-3 py-1 text-sm font-bold text-[#111827]">
+                      <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: grupoColorMap.get(data.grupo) ?? '#94A3B8' }} />
+                      {data.grupo}
+                    </p>
+                    {data.subgrupo && (
+                      <p className="text-xs font-bold text-[#4b5563]">
+                        Subgrupo: <span className="text-[#111827]">{data.subgrupo}</span>
+                      </p>
+                    )}
+                  </div>
+                ) : (
+                  <p className="text-sm font-bold text-[#111827]">No asignado</p>
+                )}
               </div>
             </div>
           </div>

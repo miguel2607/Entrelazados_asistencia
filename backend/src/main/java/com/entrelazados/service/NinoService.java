@@ -4,6 +4,7 @@ import com.entrelazados.domain.Nino;
 import com.entrelazados.persistence.entity.NinoEntity;
 import com.entrelazados.persistence.repository.NinoJpaRepository;
 import com.entrelazados.web.RecursoNoEncontradoException;
+import com.entrelazados.web.ValidacionException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -19,10 +20,12 @@ public class NinoService {
 
     private final NinoJpaRepository repo;
     private final HikvisionService hikvisionService;
+    private final GrupoService grupoService;
 
-    public NinoService(NinoJpaRepository repo, HikvisionService hikvisionService) {
+    public NinoService(NinoJpaRepository repo, HikvisionService hikvisionService, GrupoService grupoService) {
         this.repo = repo;
         this.hikvisionService = hikvisionService;
+        this.grupoService = grupoService;
     }
 
     @Transactional(readOnly = true)
@@ -49,26 +52,32 @@ public class NinoService {
     }
 
     @Transactional
-    public Nino crear(String nombre, String ti, LocalDate fechaNacimiento, String biometricId, String grupo) {
+    public Nino crear(String nombre, String ti, LocalDate fechaNacimiento, String biometricId, String grupo, String subgrupo) {
+        validarRelacionGrupoSubgrupo(grupo, subgrupo);
+        grupoService.asegurarSubgrupoEnGrupo(grupo, subgrupo);
         NinoEntity e = new NinoEntity();
         e.setNombre(nombre);
         e.setTi(ti);
         e.setFechaNacimiento(fechaNacimiento);
         e.setBiometricId(biometricId);
         e.setGrupo(grupo);
+        e.setSubgrupo(subgrupo);
         e = repo.save(e);
         hikvisionService.sincronizarNino(e);
         return toDomain(e);
     }
 
     @Transactional
-    public Nino actualizar(Integer id, String nombre, String ti, LocalDate fechaNacimiento, String biometricId, String grupo) {
+    public Nino actualizar(Integer id, String nombre, String ti, LocalDate fechaNacimiento, String biometricId, String grupo, String subgrupo) {
+        validarRelacionGrupoSubgrupo(grupo, subgrupo);
+        grupoService.asegurarSubgrupoEnGrupo(grupo, subgrupo);
         NinoEntity e = repo.findById(id).orElseThrow(() -> new RecursoNoEncontradoException("Niño no encontrado"));
         e.setNombre(nombre);
         e.setTi(ti);
         e.setFechaNacimiento(fechaNacimiento);
         e.setBiometricId(biometricId);
         e.setGrupo(grupo);
+        e.setSubgrupo(subgrupo);
         NinoEntity saved = repo.save(e);
         hikvisionService.sincronizarNino(saved);
         return toDomain(saved);
@@ -107,6 +116,12 @@ public class NinoService {
     }
 
     Nino toDomain(NinoEntity e) {
-        return new Nino(e.getId(), e.getNombre(), e.getTi(), e.getFechaNacimiento(), e.getBiometricId(), e.getGrupo());
+        return new Nino(e.getId(), e.getNombre(), e.getTi(), e.getFechaNacimiento(), e.getBiometricId(), e.getGrupo(), e.getSubgrupo());
+    }
+
+    private void validarRelacionGrupoSubgrupo(String grupo, String subgrupo) {
+        if (subgrupo != null && !subgrupo.isBlank() && (grupo == null || grupo.isBlank())) {
+            throw new ValidacionException("Para asignar un subgrupo, primero debes seleccionar un grupo.");
+        }
     }
 }

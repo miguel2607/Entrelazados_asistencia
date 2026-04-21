@@ -13,6 +13,8 @@ public interface NinoJpaRepository extends JpaRepository<NinoEntity, Integer> {
 
     List<NinoEntity> findAllByOrderByNombreAsc();
 
+    boolean existsByGrupoIgnoreCase(String grupo);
+
     java.util.Optional<NinoEntity> findByBiometricId(String biometricId);
 
     @Query(value = """

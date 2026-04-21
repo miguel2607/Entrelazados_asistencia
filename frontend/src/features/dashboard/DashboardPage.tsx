@@ -3,6 +3,7 @@ import { api } from '../../shared/api/apiClient';
 import { fechaLocalYYYYMMDD } from '../../shared/fechaLocal';
 import { Modal } from '../../shared/components/Modal';
 import { AsistenciaReportesSection } from './AsistenciaReportesSection';
+import { actualizarGrupo, crearGrupo, crearSubgrupo, eliminarGrupo, listarGrupos, listarSubgrupos, type GrupoOption, type SubgrupoOption } from '../../shared/grupos';
 
 type AlertaPlan = {
   idPlan: number;
@@ -31,7 +32,7 @@ type DashboardResponse = {
   totalNinos: number;
   totalAsistenciaHoy: number;
   totalPlanesActivosHoy: number;
-  asistenciaHoy: { id: number; idNino: number; horaEntrada?: string | null; nino: { nombre: string } }[];
+  asistenciaHoy: { id: number; idNino: number; horaEntrada?: string | null; nino: { nombre: string; grupo?: string; subgrupo?: string } }[];
   planesActivosHoy: { idNino?: number; nombreNino?: string; tipo: string; nombre: string; sesionesRestantes: number; servicios: { nombre: string }[] }[];
   alertasPlanes: AlertaPlan[];
   alertasTiempo: AlertaTiempo[];
@@ -39,7 +40,7 @@ type DashboardResponse = {
 };
 
 type NinoResumen = { id: number; nombre: string; biometricId?: string };
-type Step1Form = { nombre: string; ti: string; fechaNacimiento: string; biometricId: string; grupo: string };
+type Step1Form = { nombre: string; ti: string; fechaNacimiento: string; biometricId: string; grupo: string; subgrupo: string };
 type Step2Form = { nombre: string; cc: string; telefono: string; parentesco: string };
 
 /** Intervalo de actualización del dashboard para disminuir carga en Render. */
@@ -60,7 +61,7 @@ export function DashboardPage() {
   // Wizard añadir niño
   const [wizardOpen, setWizardOpen] = useState(false);
   const [wizardStep, setWizardStep] = useState<1 | 2>(1);
-  const [step1, setStep1] = useState<Step1Form>({ nombre: '', ti: '', fechaNacimiento: '', biometricId: '', grupo: '' });
+  const [step1, setStep1] = useState<Step1Form>({ nombre: '', ti: '', fechaNacimiento: '', biometricId: '', grupo: '', subgrupo: '' });
   const [step2, setStep2] = useState<Step2Form>({ nombre: '', cc: '', telefono: '', parentesco: '' });
   const [wizardSaving, setWizardSaving] = useState(false);
   const [suggestingBiometricId, setSuggestingBiometricId] = useState(false);
@@ -71,6 +72,20 @@ export function DashboardPage() {
   const [similarNinos, setSimilarNinos] = useState<{ id: number; nombre: string }[]>([]);
   const [similarAcudientes, setSimilarAcudientes] = useState<{ id: number; nombre: string; telefono?: string; cc?: string }[]>([]);
   const searchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [grupos, setGrupos] = useState<GrupoOption[]>([]);
+  const [grupoModalOpen, setGrupoModalOpen] = useState(false);
+  const [nuevoGrupoNombre, setNuevoGrupoNombre] = useState('');
+  const [nuevoGrupoColor, setNuevoGrupoColor] = useState('#2563EB');
+  const [grupoError, setGrupoError] = useState<string | null>(null);
+  const [savingGrupo, setSavingGrupo] = useState(false);
+  const [editingGrupoId, setEditingGrupoId] = useState<number | null>(null);
+  const [editGrupoNombre, setEditGrupoNombre] = useState('');
+  const [editGrupoColor, setEditGrupoColor] = useState('#2563EB');
+  const [subgruposCatalogo, setSubgruposCatalogo] = useState<Record<number, SubgrupoOption[]>>({});
+  const [showNuevoSubgrupo, setShowNuevoSubgrupo] = useState(false);
+  const [nuevoSubgrupoNombre, setNuevoSubgrupoNombre] = useState('');
+  const grupoColorMap = new Map(grupos.map((g) => [g.nombre, g.color]));
+  const grupoSeleccionadoId = grupos.find((g) => g.nombre === step1.grupo)?.id;
 
   const searchSimilarNinos = (nombre: string) => {
     if (searchTimeoutRef.current) clearTimeout(searchTimeoutRef.current);
@@ -122,7 +137,7 @@ export function DashboardPage() {
 
   const openWizard = () => {
     setWizardStep(1);
-    setStep1({ nombre: '', ti: '', fechaNacimiento: '', biometricId: '', grupo: '' });
+    setStep1({ nombre: '', ti: '', fechaNacimiento: '', biometricId: '', grupo: '', subgrupo: '' });
     setStep2({ nombre: '', cc: '', telefono: '', parentesco: '' });
     setWizardError(null);
     setCreatedNinoId(null);
@@ -145,6 +160,7 @@ export function DashboardPage() {
         fechaNacimiento: step1.fechaNacimiento,
         biometricId: step1.biometricId || undefined,
         grupo: step1.grupo || undefined,
+        subgrupo: step1.subgrupo || undefined,
       });
       setCreatedNinoId(nino.id);
       setWizardStep(2);
@@ -185,6 +201,117 @@ export function DashboardPage() {
     fetchLiveData();
   };
 
+  const agregarGrupo = async (e: React.SyntheticEvent) => {
+    e.preventDefault();
+    const nombre = nuevoGrupoNombre.trim().replaceAll(/\s+/g, ' ');
+    if (!nombre) {
+      setGrupoError('Debes ingresar un nombre de grupo.');
+      return;
+    }
+    setSavingGrupo(true);
+    setGrupoError(null);
+    try {
+      const creado = await crearGrupo({ nombre, color: nuevoGrupoColor });
+      const actualizados = [...grupos, creado].sort((a, b) => a.nombre.localeCompare(b.nombre));
+      setGrupos(actualizados);
+      setStep1((prev) => ({ ...prev, grupo: creado.nombre }));
+      setNuevoGrupoNombre('');
+      setNuevoGrupoColor('#2563EB');
+      setGrupoModalOpen(false);
+    } catch (err: any) {
+      setGrupoError(err?.message ?? 'No se pudo crear el grupo.');
+    } finally {
+      setSavingGrupo(false);
+    }
+  };
+
+  const iniciarEdicionGrupo = (grupo: GrupoOption) => {
+    setGrupoError(null);
+    setEditingGrupoId(grupo.id);
+    setEditGrupoNombre(grupo.nombre);
+    setEditGrupoColor(grupo.color);
+  };
+
+  const cancelarEdicionGrupo = () => {
+    setEditingGrupoId(null);
+    setEditGrupoNombre('');
+    setEditGrupoColor('#2563EB');
+  };
+
+  const guardarEdicionGrupo = async (e: React.SyntheticEvent) => {
+    e.preventDefault();
+    if (editingGrupoId == null) return;
+    const nombre = editGrupoNombre.trim().replaceAll(/\s+/g, ' ');
+    if (!nombre) {
+      setGrupoError('Debes ingresar un nombre de grupo.');
+      return;
+    }
+    setSavingGrupo(true);
+    setGrupoError(null);
+    try {
+      const actualizado = await actualizarGrupo(editingGrupoId, { nombre, color: editGrupoColor });
+      const previo = grupos.find((g) => g.id === editingGrupoId);
+      const actualizados = grupos
+        .map((g) => (g.id === editingGrupoId ? actualizado : g))
+        .sort((a, b) => a.nombre.localeCompare(b.nombre));
+      setGrupos(actualizados);
+      if (step1.grupo === previo?.nombre) {
+        setStep1((prev) => ({ ...prev, grupo: actualizado.nombre }));
+      }
+      cancelarEdicionGrupo();
+    } catch (err: any) {
+      setGrupoError(err?.message ?? 'No se pudo actualizar el grupo.');
+    } finally {
+      setSavingGrupo(false);
+    }
+  };
+
+  const borrarGrupo = async (grupo: GrupoOption) => {
+    const ok = globalThis.confirm(`¿Eliminar el grupo "${grupo.nombre}"?`);
+    if (!ok) return;
+    setSavingGrupo(true);
+    setGrupoError(null);
+    try {
+      await eliminarGrupo(grupo.id);
+      setGrupos((prev) => prev.filter((g) => g.id !== grupo.id));
+      if (step1.grupo === grupo.nombre) {
+        setStep1((prev) => ({ ...prev, grupo: '' }));
+      }
+    } catch (err: any) {
+      setGrupoError(err?.message ?? 'No se pudo eliminar el grupo.');
+    } finally {
+      setSavingGrupo(false);
+    }
+  };
+
+  const guardarNuevoSubgrupo = async () => {
+    if (!grupoSeleccionadoId) {
+      setGrupoError('Primero debes seleccionar un grupo.');
+      return;
+    }
+    const nombre = nuevoSubgrupoNombre.trim();
+    if (!nombre) {
+      setGrupoError('Escribe el nombre del subgrupo.');
+      return;
+    }
+    setSavingGrupo(true);
+    setGrupoError(null);
+    try {
+      const nuevo = await crearSubgrupo(grupoSeleccionadoId, nombre);
+      setSubgruposCatalogo((prev) => ({
+        ...prev,
+        [grupoSeleccionadoId]: [...(prev[grupoSeleccionadoId] ?? []), nuevo],
+      }));
+      setStep1((f) => ({ ...f, subgrupo: nuevo.nombre }));
+      setNuevoSubgrupoNombre('');
+      setShowNuevoSubgrupo(false);
+    } catch (err: any) {
+      setGrupoError(err?.message ?? 'No se pudo crear el subgrupo.');
+    } finally {
+      setSavingGrupo(false);
+    }
+  };
+
   // Fetch live attendance data
   const fetchLiveData = useCallback((opts?: { showLoader?: boolean; showError?: boolean }) => {
     if (dashboardRequestInFlightRef.current) return;
@@ -210,6 +337,17 @@ export function DashboardPage() {
   useEffect(() => {
     fetchLiveData({ showLoader: true, showError: true });
   }, [fetchLiveData]);
+  useEffect(() => {
+    listarGrupos()
+      .then(setGrupos)
+      .catch(() => setGrupoError('No se pudieron cargar los grupos.'));
+  }, []);
+  useEffect(() => {
+    if (!grupoSeleccionadoId || subgruposCatalogo[grupoSeleccionadoId]) return;
+    listarSubgrupos(grupoSeleccionadoId)
+      .then((rows) => setSubgruposCatalogo((prev) => ({ ...prev, [grupoSeleccionadoId]: rows })))
+      .catch(() => undefined);
+  }, [grupoSeleccionadoId, subgruposCatalogo]);
 
   // Live polling for "En Sala Ahora"
   useEffect(() => {
@@ -310,7 +448,7 @@ export function DashboardPage() {
   if (!data) return null;
 
   return (
-    <div className="space-y-10 max-w-7xl">
+    <div className="mx-auto w-full max-w-[min(100%,92rem)] space-y-10 px-1 sm:px-0">
       <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-end animate-fade-in">
         <div>
           <h2 className="text-3xl font-extrabold text-[#111827] tracking-tight">
@@ -367,81 +505,135 @@ export function DashboardPage() {
         </div>
       </div>
 
-      {/* EN SALA AHORA — bloque destacado a ancho completo */}
-      <section className="animate-fade-in stagger-4 relative overflow-hidden rounded-3xl border-2 border-indigo-100/80 bg-gradient-to-br from-white via-[#f5f3ff] to-[#ede9fe] p-6 shadow-xl shadow-indigo-100/40 sm:p-8 lg:p-10">
-        <div className="pointer-events-none absolute -right-20 -top-20 h-64 w-64 rounded-full bg-[#4c1d95]/20 blur-3xl" />
-        <div className="pointer-events-none absolute -bottom-16 -left-16 h-48 w-48 rounded-full bg-[#2d1b69]/10 blur-3xl" />
-        <div className="relative flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between">
-          <div className="space-y-2">
-            <div className="flex flex-wrap items-center gap-3">
-              <h3 className="text-2xl font-extrabold tracking-tight text-[#111827] sm:text-3xl">En sala ahora</h3>
-              <span className="inline-flex items-center gap-2 rounded-full border border-orange-200 bg-orange-50 px-3 py-1 text-[11px] font-extrabold uppercase tracking-widest text-orange-700">
-                <span className="h-2 w-2 rounded-full bg-orange-500 animate-ping" />
-                En vivo
-              </span>
-            </div>
-            <p className="max-w-xl text-sm text-[#4b5563]">
-              Estudiantes con entrada registrada y sin salida en el día. Se actualiza automáticamente.
-            </p>
-            {lastUpdated && (
-              <p className="text-sm font-semibold text-[#6b7280]">
-                Última actualización: {lastUpdated.toLocaleTimeString('es-CO')}
+      {/* EN SALA AHORA — cabecera unificada + fichas alineadas (5 cols xl) */}
+      <section className="animate-fade-in stagger-4 relative overflow-hidden rounded-[1.75rem] border border-violet-200/50 bg-gradient-to-br from-[#faf8ff] via-white to-[#f3e8ff] p-1 shadow-[0_20px_50px_-12px_rgba(76,29,149,0.15)] sm:rounded-3xl">
+        <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(900px_circle_at_0%_-20%,rgba(124,58,237,0.08),transparent),radial-gradient(700px_circle_at_100%_100%,rgba(249,115,22,0.06),transparent)]" />
+        <div className="pointer-events-none absolute -right-32 top-1/2 h-96 w-96 -translate-y-1/2 rounded-full bg-violet-300/20 blur-3xl" />
+
+        <div className="relative p-5 sm:p-7 lg:p-8">
+          <div className="flex flex-col gap-5 rounded-2xl border border-white/80 bg-white/70 p-4 shadow-sm backdrop-blur-md sm:p-5 lg:flex-row lg:items-center lg:justify-between lg:gap-6">
+            <div className="min-w-0 flex-1 space-y-2.5">
+              <div className="flex flex-wrap items-center gap-2.5 sm:gap-3">
+                <h3 className="text-2xl font-black tracking-tight text-slate-900 sm:text-3xl">En sala ahora</h3>
+                <span className="inline-flex items-center gap-1.5 rounded-full bg-gradient-to-r from-orange-500 to-amber-500 px-3 py-1 text-[10px] font-bold uppercase tracking-widest text-white shadow-md shadow-orange-200/50">
+                  <span className="relative flex h-2 w-2">
+                    <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-white/60" />
+                    <span className="relative h-2 w-2 rounded-full bg-white" />
+                  </span>
+                  <span>En vivo</span>
+                </span>
+              </div>
+              <p className="max-w-2xl text-sm leading-relaxed text-slate-600">
+                Entrada hoy sin salida registrada. La lista se actualiza sola; puedes forzar un refresco cuando quieras.
               </p>
+              {lastUpdated && (
+                <p className="text-xs font-medium text-slate-500">
+                  Última actualización · <span className="font-mono text-slate-700">{lastUpdated.toLocaleTimeString('es-CO')}</span>
+                </p>
+              )}
+            </div>
+            <div className="flex shrink-0 flex-col gap-3 sm:flex-row sm:items-stretch">
+              <div className="flex min-w-[8.5rem] flex-col justify-center rounded-2xl border border-violet-200/60 bg-gradient-to-br from-[#4c1d95] via-[#5b21b6] to-[#4c1d95] px-5 py-4 text-center text-white shadow-lg shadow-violet-900/25">
+                <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-violet-200/90">Total adentro</span>
+                <span className="mt-1 text-4xl font-black tabular-nums leading-none sm:text-5xl">{liveAsistencia.length}</span>
+              </div>
+              <button
+                type="button"
+                onClick={() => fetchLiveData()}
+                className="inline-flex items-center justify-center gap-2 self-stretch rounded-2xl border-2 border-orange-400/80 bg-gradient-to-br from-amber-400 to-orange-500 px-5 py-3 text-xs font-extrabold uppercase tracking-widest text-white shadow-md shadow-orange-200/60 transition hover:brightness-105 active:scale-[0.98] sm:min-w-[10rem]"
+              >
+                <svg className="h-5 w-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                </svg>
+                Actualizar
+              </button>
+            </div>
+          </div>
+
+          <div className="relative mt-5 rounded-2xl border border-slate-200/60 bg-slate-50/40 p-2 sm:mt-6 sm:p-3">
+            {liveAsistencia.length === 0 ? (
+              <div className="flex min-h-[220px] flex-col items-center justify-center gap-4 py-12 text-center">
+                <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-white shadow-inner ring-1 ring-violet-100">
+                  <svg className="h-8 w-8 text-violet-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+                  </svg>
+                </div>
+                <div>
+                  <p className="text-lg font-bold text-slate-700">Nadie en sala</p>
+                  <p className="mt-1 text-sm text-slate-500">Las fichas aparecerán aquí al registrar entrada.</p>
+                </div>
+              </div>
+            ) : (
+              <ul className="grid auto-rows-fr grid-cols-1 gap-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6">
+                {asistenciaOrdenada.map((a, idx) => {
+                  const accent = a.nino?.grupo ? (grupoColorMap.get(a.nino.grupo) ?? '#7c3aed') : '#a78bfa';
+                  return (
+                    <li
+                      key={a.id}
+                      className={`group relative flex h-full min-h-[188px] flex-col overflow-hidden rounded-xl border border-white/90 bg-white shadow-sm shadow-slate-200/40 ring-1 ring-slate-100/80 transition duration-300 hover:-translate-y-0.5 hover:shadow-md hover:shadow-violet-200/30 animate-slide-in-right stagger-${(idx % 5) + 1}`}
+                    >
+                      <div
+                        className="h-0.5 w-full shrink-0"
+                        style={{ background: `linear-gradient(90deg, ${accent}, ${accent}66, transparent)` }}
+                      />
+                      <div className="flex flex-1 flex-col p-2.5 pt-2">
+                        <div className="flex gap-2">
+                          <div
+                            className="relative flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-sm font-black text-white shadow-sm ring-1 ring-white/80"
+                            style={{
+                              background: `linear-gradient(135deg, ${accent}, #2d1b69)`,
+                            }}
+                          >
+                            {(a.nino?.nombre ?? 'E').charAt(0)}
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <p className="line-clamp-2 min-h-[2.5rem] text-sm font-bold leading-tight text-slate-900 sm:min-h-[2.65rem] sm:text-[0.9375rem]">
+                              {a.nino?.nombre ?? 'Estudiante'}
+                            </p>
+                            <p className="mt-0.5 text-[9px] font-medium uppercase tracking-wide text-slate-500">
+                              Entrada
+                            </p>
+                            <p className="font-mono text-[11px] font-semibold leading-tight text-slate-800">
+                              {formatHoraEntrada(a.horaEntrada)}
+                            </p>
+                          </div>
+                        </div>
+                        <div className="mt-2 rounded-lg border border-amber-100/90 bg-gradient-to-b from-amber-50/90 to-orange-50/80 px-1.5 py-1.5 text-center shadow-inner">
+                          <p className="text-[8px] font-bold uppercase tracking-[0.1em] text-amber-900/70">Lleva en sala</p>
+                          <p className="mt-px font-mono text-sm font-black tracking-tight text-amber-950">
+                            {formatTiempoEnSala(a.horaEntrada)}
+                          </p>
+                        </div>
+                        <div className="mt-2 flex min-h-[2.65rem] flex-1 flex-col justify-end gap-1 border-t border-slate-100 pt-1.5">
+                          {a.nino?.grupo ? (
+                            <>
+                              <span
+                                className="inline-flex max-w-full items-center truncate rounded-md border bg-slate-50/80 px-1.5 py-0.5 text-[8px] font-bold uppercase tracking-wide text-violet-950"
+                                style={{ borderColor: `${accent}99` }}
+                              >
+                                {a.nino.grupo}
+                              </span>
+                              <span className="line-clamp-1 rounded-md border border-slate-200/80 bg-white px-1.5 py-0.5 text-[8px] font-semibold text-slate-600">
+                                {a.nino.subgrupo ? (
+                                  <>Subgrupo · <span className="font-bold text-slate-800">{a.nino.subgrupo}</span></>
+                                ) : (
+                                  <span className="text-slate-400">Sin subgrupo</span>
+                                )}
+                              </span>
+                            </>
+                          ) : (
+                            <span className="rounded-md border border-dashed border-slate-200 bg-slate-50/50 px-1.5 py-1 text-center text-[8px] font-medium text-slate-400">
+                              Sin grupo asignado
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    </li>
+                  );
+                })}
+              </ul>
             )}
           </div>
-          <button
-            type="button"
-            onClick={() => fetchLiveData()}
-            className="inline-flex items-center justify-center gap-2 rounded-xl border-2 border-orange-300 bg-gradient-to-r from-amber-400 to-orange-500 px-5 py-3 text-sm font-extrabold uppercase tracking-widest text-white shadow-sm transition hover:from-amber-500 hover:to-orange-600"
-          >
-            <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-            </svg>
-            Actualizar ahora
-          </button>
-          <div className="flex shrink-0 flex-col items-stretch gap-3 sm:flex-row sm:items-center lg:flex-col lg:items-end">
-            <div className="rounded-2xl border border-indigo-100 bg-white/90 px-6 py-4 text-center shadow-sm backdrop-blur-sm">
-              <p className="text-[11px] font-extrabold uppercase tracking-widest text-[#6b7280]">Total adentro</p>
-              <p className="mt-1 text-5xl font-black tabular-nums leading-none text-[#4c1d95] sm:text-6xl">
-                {liveAsistencia.length}
-              </p>
-            </div>
-          </div>
-        </div>
-        <div className="relative mt-8 min-h-[640px] rounded-2xl border border-indigo-100 bg-white/60 p-4 backdrop-blur-sm sm:p-6">
-          {liveAsistencia.length === 0 ? (
-            <div className="flex min-h-[200px] flex-col items-center justify-center gap-3 py-10 text-center text-[#9ca3af]">
-              <svg className="h-16 w-16 text-[#e2e8f0]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
-              </svg>
-              <p className="text-lg font-bold text-[#6b7280]">Nadie en sala en este momento</p>
-              <p className="text-sm">Cuando registren entrada, aparecerán aquí con letra grande.</p>
-            </div>
-          ) : (
-            <ul className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
-              {asistenciaOrdenada.map((a, idx) => (
-                <li
-                  key={a.id}
-                  className={`flex min-h-[96px] items-center gap-3 rounded-2xl border-2 border-white bg-gradient-to-br from-[#f3e8ff] to-white p-4 shadow-md shadow-indigo-100/50 transition hover:border-indigo-200 hover:shadow-lg animate-slide-in-right stagger-${(idx % 5) + 1}`}
-                >
-                  <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-[#4c1d95] to-[#2d1b69] text-xl font-black text-white shadow-inner">
-                    {(a.nino?.nombre ?? 'E').charAt(0)}
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <p className="whitespace-normal break-words text-lg font-extrabold leading-tight text-[#111827]">
-                      {a.nino?.nombre ?? 'Estudiante'}
-                    </p>
-                    <span className="mt-1 inline-block rounded-lg bg-orange-50 border border-orange-100 px-2.5 py-1 text-[11px] font-extrabold uppercase tracking-widest text-orange-700">
-                      {formatTiempoEnSala(a.horaEntrada)}
-                    </span>
-                    <p className="mt-1 text-xs font-semibold text-[#4b5563]">
-                      Entró: <span className="font-mono text-[#111827]">{formatHoraEntrada(a.horaEntrada)}</span>
-                    </p>
-                  </div>
-                </li>
-              ))}
-            </ul>
-          )}
         </div>
       </section>
 
@@ -669,18 +861,76 @@ export function DashboardPage() {
               </div>
             </div>
             <div className="space-y-1.5">
-              <label className="block text-[11px] font-extrabold text-[#4b5563] uppercase tracking-widest">Grupo</label>
+              <div className="flex items-center justify-between gap-3">
+                <label className="block text-[11px] font-extrabold text-[#4b5563] uppercase tracking-widest">Grupo</label>
+                <button
+                  type="button"
+                  onClick={() => setGrupoModalOpen(true)}
+                  className="text-[10px] font-extrabold uppercase tracking-widest text-[#2d1b69] hover:text-[#4c1d95]"
+                >
+                  + Administrar grupos
+                </button>
+              </div>
               <select
                 required
                 value={step1.grupo}
-                onChange={(e) => setStep1((f) => ({ ...f, grupo: e.target.value }))}
+                onChange={(e) => {
+                  setStep1((f) => ({ ...f, grupo: e.target.value, subgrupo: '' }));
+                  setShowNuevoSubgrupo(false);
+                  setNuevoSubgrupoNombre('');
+                }}
                 className="w-full rounded-xl border border-[#e2e8f0] px-4 py-3 text-sm font-medium focus:border-[#2d1b69] focus:outline-none focus:ring-4 focus:ring-indigo-50 transition-all bg-white"
               >
                 <option value="">Seleccionar grupo...</option>
-                <option value="APRENDER JUGANDO">APRENDER JUGANDO</option>
-                <option value="ESTIMULACION Y NURODESARROLLO">ESTIMULACION Y NURODESARROLLO</option>
-                <option value="CLASES EXTRACURRICULARES">CLASES EXTRACURRICULARES</option>
+                {grupos.map((grupo) => (
+                  <option key={grupo.nombre} value={grupo.nombre}>{grupo.nombre}</option>
+                ))}
               </select>
+              {step1.grupo && (
+                <p className="text-[10px] font-bold text-[#4b5563] flex items-center gap-2">
+                  <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: grupoColorMap.get(step1.grupo) ?? '#94A3B8' }} />
+                  Color asignado a {step1.grupo}
+                </p>
+              )}
+            </div>
+            <div className="space-y-1.5">
+              <label htmlFor="dashboard-nino-subgrupo" className="block text-[11px] font-extrabold text-[#4b5563] uppercase tracking-widest">Subgrupo</label>
+              <select
+                id="dashboard-nino-subgrupo"
+                value={showNuevoSubgrupo ? '__nuevo__' : step1.subgrupo}
+                onChange={(e) => {
+                  const value = e.target.value;
+                  if (value === '__nuevo__') {
+                    setShowNuevoSubgrupo(true);
+                    setStep1((f) => ({ ...f, subgrupo: '' }));
+                    return;
+                  }
+                  setShowNuevoSubgrupo(false);
+                  setNuevoSubgrupoNombre('');
+                  setStep1((f) => ({ ...f, subgrupo: value }));
+                }}
+                className="w-full rounded-xl border border-[#e2e8f0] px-4 py-3 text-sm font-medium focus:border-[#2d1b69] focus:outline-none focus:ring-4 focus:ring-indigo-50 transition-all bg-white"
+                disabled={!grupoSeleccionadoId}
+              >
+                <option value="">{grupoSeleccionadoId ? 'Seleccionar subgrupo...' : 'Selecciona primero un grupo'}</option>
+                {(grupoSeleccionadoId ? (subgruposCatalogo[grupoSeleccionadoId] ?? []) : []).map((s) => (
+                  <option key={s.id} value={s.nombre}>{s.nombre}</option>
+                ))}
+                {grupoSeleccionadoId && <option value="__nuevo__">+ Crear subgrupo</option>}
+              </select>
+              {showNuevoSubgrupo && (
+                <div className="flex gap-2">
+                  <input
+                    value={nuevoSubgrupoNombre}
+                    onChange={(e) => setNuevoSubgrupoNombre(e.target.value)}
+                    placeholder="Nombre del nuevo subgrupo"
+                    className="flex-1 rounded-xl border border-[#e2e8f0] px-4 py-2 text-sm font-medium focus:border-[#2d1b69] focus:outline-none focus:ring-4 focus:ring-indigo-50 transition-all"
+                  />
+                  <button type="button" onClick={guardarNuevoSubgrupo} disabled={savingGrupo} className="google-button-secondary disabled:opacity-50">
+                    {savingGrupo ? 'Guardando...' : 'Crear'}
+                  </button>
+                </div>
+              )}
             </div>
             <div className="space-y-1.5">
               <label className="block text-[11px] font-extrabold text-[#4b5563] uppercase tracking-widest">ID Biométrico (Equipo Hikvision)</label>
@@ -786,6 +1036,91 @@ export function DashboardPage() {
             </div>
           </form>
         )}
+      </Modal>
+
+      <Modal
+        open={grupoModalOpen}
+        onClose={() => {
+          setGrupoModalOpen(false);
+          setGrupoError(null);
+        }}
+        title="Administrar grupos"
+      >
+        <div className="space-y-5">
+          <div className="max-h-52 space-y-2 overflow-y-auto rounded-xl border border-[#e2e8f0] p-3">
+            {grupos.map((grupo) => (
+              <div key={grupo.id} className="flex items-center justify-between gap-2 rounded-lg bg-[#fcfaff] px-3 py-2 text-sm font-bold text-[#111827]">
+                <span className="inline-flex items-center gap-2">
+                  <span className="h-3 w-3 rounded-full" style={{ backgroundColor: grupo.color }} />
+                  <span>{grupo.nombre}</span>
+                </span>
+                <span className="inline-flex items-center gap-2">
+                  <button type="button" onClick={() => iniciarEdicionGrupo(grupo)} className="text-[10px] font-extrabold text-[#2d1b69] uppercase">Editar</button>
+                  <button type="button" onClick={() => borrarGrupo(grupo)} className="text-[10px] font-extrabold text-rose-600 uppercase">Eliminar</button>
+                </span>
+              </div>
+            ))}
+          </div>
+
+          {editingGrupoId != null && (
+            <form onSubmit={guardarEdicionGrupo} className="space-y-3 rounded-xl border border-[#e2e8f0] p-3">
+              <p className="text-[11px] font-extrabold uppercase tracking-widest text-[#4b5563]">Editar grupo</p>
+              <div className="space-y-1.5">
+                <label htmlFor="dashboard-editar-grupo-nombre" className="block text-[11px] font-extrabold text-[#4b5563] uppercase tracking-widest">Nombre</label>
+                <input
+                  id="dashboard-editar-grupo-nombre"
+                  value={editGrupoNombre}
+                  onChange={(e) => setEditGrupoNombre(e.target.value)}
+                  className="w-full rounded-xl border border-[#e2e8f0] px-4 py-3 text-sm font-medium focus:border-[#2d1b69] focus:outline-none focus:ring-4 focus:ring-indigo-50 transition-all"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <label htmlFor="dashboard-editar-grupo-color" className="block text-[11px] font-extrabold text-[#4b5563] uppercase tracking-widest">Color</label>
+                <input
+                  id="dashboard-editar-grupo-color"
+                  type="color"
+                  value={editGrupoColor}
+                  onChange={(e) => setEditGrupoColor(e.target.value)}
+                  className="h-11 w-full rounded-xl border border-[#e2e8f0] bg-white px-2 py-1"
+                />
+              </div>
+              <div className="flex justify-end gap-3">
+                <button type="button" onClick={cancelarEdicionGrupo} className="google-button-secondary">Cancelar</button>
+                <button type="submit" disabled={savingGrupo} className="google-button-primary disabled:opacity-50">Guardar</button>
+              </div>
+            </form>
+          )}
+
+          <form onSubmit={agregarGrupo} className="space-y-3">
+            <div className="space-y-1.5">
+              <label htmlFor="dashboard-nuevo-grupo-nombre" className="block text-[11px] font-extrabold text-[#4b5563] uppercase tracking-widest">Nombre del grupo</label>
+              <input
+                id="dashboard-nuevo-grupo-nombre"
+                value={nuevoGrupoNombre}
+                onChange={(e) => setNuevoGrupoNombre(e.target.value)}
+                placeholder="Ej: Pre-jardín A"
+                className="w-full rounded-xl border border-[#e2e8f0] px-4 py-3 text-sm font-medium focus:border-[#2d1b69] focus:outline-none focus:ring-4 focus:ring-indigo-50 transition-all"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <label htmlFor="dashboard-nuevo-grupo-color" className="block text-[11px] font-extrabold text-[#4b5563] uppercase tracking-widest">Color</label>
+              <input
+                id="dashboard-nuevo-grupo-color"
+                type="color"
+                value={nuevoGrupoColor}
+                onChange={(e) => setNuevoGrupoColor(e.target.value)}
+                className="h-11 w-full rounded-xl border border-[#e2e8f0] bg-white px-2 py-1"
+              />
+            </div>
+            {grupoError && <p className="text-xs font-bold text-rose-700">{grupoError}</p>}
+            <div className="flex justify-end gap-3 pt-3 border-t border-[#e2e8f0]">
+              <button type="button" onClick={() => setGrupoModalOpen(false)} className="google-button-secondary">Cerrar</button>
+              <button type="submit" disabled={savingGrupo} className="google-button-primary disabled:opacity-50">
+                {savingGrupo ? 'Guardando...' : 'Agregar grupo'}
+              </button>
+            </div>
+          </form>
+        </div>
       </Modal>
     </div>
   );
