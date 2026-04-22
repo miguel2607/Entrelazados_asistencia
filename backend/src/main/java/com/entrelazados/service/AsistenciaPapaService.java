@@ -103,8 +103,8 @@ public class AsistenciaPapaService {
 
         if (e.getHoraEntrada() != null) {
             long segundosDesdeEntrada = Duration.between(e.getHoraEntrada(), h).getSeconds();
-            if (segundosDesdeEntrada < 60) {
-                throw new ConflictoException("La salida solo se puede registrar despues de 1 minuto de la entrada.");
+            if (segundosDesdeEntrada < 300) {
+                throw new ConflictoException("La salida solo se puede registrar despues de 5 minutos de la entrada.");
             }
         }
 

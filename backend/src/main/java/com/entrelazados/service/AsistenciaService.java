@@ -98,11 +98,11 @@ public class AsistenciaService {
         AsistenciaEntity e = repo.findTopByIdNinoAndFechaAndHoraSalidaIsNullOrderByIdDesc(idNino, fecha)
                 .orElseThrow(() -> new RecursoNoEncontradoException("No se encontró una entrada activa para registrar la salida"));
 
-        // Evitar doble marcación accidental: exigir al menos 1 minuto entre entrada y salida.
+        // Evitar doble marcación accidental: exigir al menos 5 minutos entre entrada y salida.
         if (e.getHoraEntrada() != null) {
             long segundosDesdeEntrada = Duration.between(e.getHoraEntrada(), horaSalida).getSeconds();
-            if (segundosDesdeEntrada < 60) {
-                throw new ConflictoException("La salida solo se puede registrar despues de 1 minuto de la entrada.");
+            if (segundosDesdeEntrada < 300) {
+                throw new ConflictoException("La salida solo se puede registrar despues de 5 minutos de la entrada.");
             }
         }
 
