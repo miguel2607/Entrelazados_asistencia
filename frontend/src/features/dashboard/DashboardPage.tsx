@@ -505,6 +505,62 @@ export function DashboardPage() {
         </div>
       </div>
 
+      {alertasCriticas.length > 0 && (
+        <div className="rounded-2xl border border-rose-100 bg-rose-50/50 p-6 shadow-sm animate-scale-in stagger-5">
+          <div className="flex items-center gap-3 mb-6">
+            <div className="h-8 w-8 rounded-lg bg-rose-100 flex items-center justify-center text-rose-600">
+              <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+              </svg>
+            </div>
+            <h3 className="text-sm font-bold text-rose-800 uppercase tracking-widest">
+              Alertas de Planes
+            </h3>
+          </div>
+          <div className="space-y-3">
+            {alertasCriticas.map((a, idx) => (
+              <div
+                key={a.key}
+                className={`flex flex-wrap items-center justify-between gap-4 rounded-xl bg-white border border-rose-100 px-5 py-4 shadow-sm hover:border-rose-300 transition-colors animate-slide-in-right stagger-${(idx % 5) + 1}`}
+              >
+                <div className="flex items-center gap-4">
+                  <div className="h-8 w-8 rounded-full bg-rose-50 flex items-center justify-center text-rose-500 font-bold text-xs ring-2 ring-white">
+                    {a.nombreNino.charAt(0)}
+                  </div>
+                  <div>
+                    <span className="text-sm font-bold text-[#111827]">{a.nombreNino}</span>
+                    <p className="text-[10px] text-[#4b5563] font-medium uppercase tracking-tighter">{a.nombrePlan}</p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-6">
+                  <div className="text-right">
+                    <p className={`text-sm font-bold ${a.colorMensaje}`}>{a.mensaje}</p>
+                    <p className="text-[10px] text-[#4b5563] font-bold uppercase tracking-widest">
+                      {a.tipo === 'sesiones' ? 'Por sesiones' : 'Por tiempo'}
+                    </p>
+                  </div>
+                  {a.tipo === 'sesiones' && a.idPlan != null ? (
+                    <button
+                      onClick={() => desestimarAlerta(a.idPlan)}
+                      className="h-8 w-8 rounded-lg hover:bg-rose-100 flex items-center justify-center text-rose-400 transition-colors"
+                      title="Desestimar por 24 horas"
+                    >
+                      <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" /></svg>
+                    </button>
+                  ) : (
+                    <div className="h-8 w-8 rounded-lg bg-amber-50 border border-amber-100 flex items-center justify-center text-amber-600">
+                      <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
+                    </div>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* EN SALA AHORA — cabecera unificada + fichas alineadas (5 cols xl) */}
       <section className="animate-fade-in stagger-4 relative overflow-hidden rounded-[1.75rem] border border-violet-200/50 bg-gradient-to-br from-[#faf8ff] via-white to-[#f3e8ff] p-1 shadow-[0_20px_50px_-12px_rgba(76,29,149,0.15)] sm:rounded-3xl">
         <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(900px_circle_at_0%_-20%,rgba(124,58,237,0.08),transparent),radial-gradient(700px_circle_at_100%_100%,rgba(249,115,22,0.06),transparent)]" />
@@ -695,62 +751,6 @@ export function DashboardPage() {
           ))}
         </div>
       </div>
-
-      {alertasCriticas.length > 0 && (
-        <div className="rounded-2xl border border-rose-100 bg-rose-50/50 p-6 shadow-sm animate-scale-in stagger-5">
-          <div className="flex items-center gap-3 mb-6">
-            <div className="h-8 w-8 rounded-lg bg-rose-100 flex items-center justify-center text-rose-600">
-              <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-              </svg>
-            </div>
-            <h3 className="text-sm font-bold text-rose-800 uppercase tracking-widest">
-              Alertas de Planes
-            </h3>
-          </div>
-          <div className="space-y-3">
-            {alertasCriticas.map((a, idx) => (
-              <div
-                key={a.key}
-                className={`flex flex-wrap items-center justify-between gap-4 rounded-xl bg-white border border-rose-100 px-5 py-4 shadow-sm hover:border-rose-300 transition-colors animate-slide-in-right stagger-${(idx % 5) + 1}`}
-              >
-                <div className="flex items-center gap-4">
-                  <div className="h-8 w-8 rounded-full bg-rose-50 flex items-center justify-center text-rose-500 font-bold text-xs ring-2 ring-white">
-                    {a.nombreNino.charAt(0)}
-                  </div>
-                  <div>
-                    <span className="text-sm font-bold text-[#111827]">{a.nombreNino}</span>
-                    <p className="text-[10px] text-[#4b5563] font-medium uppercase tracking-tighter">{a.nombrePlan}</p>
-                  </div>
-                </div>
-                <div className="flex items-center gap-6">
-                  <div className="text-right">
-                    <p className={`text-sm font-bold ${a.colorMensaje}`}>{a.mensaje}</p>
-                    <p className="text-[10px] text-[#4b5563] font-bold uppercase tracking-widest">
-                      {a.tipo === 'sesiones' ? 'Por sesiones' : 'Por tiempo'}
-                    </p>
-                  </div>
-                  {a.tipo === 'sesiones' && a.idPlan != null ? (
-                    <button
-                      onClick={() => desestimarAlerta(a.idPlan)}
-                      className="h-8 w-8 rounded-lg hover:bg-rose-100 flex items-center justify-center text-rose-400 transition-colors"
-                      title="Desestimar por 24 horas"
-                    >
-                      <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" /></svg>
-                    </button>
-                  ) : (
-                    <div className="h-8 w-8 rounded-lg bg-amber-50 border border-amber-100 flex items-center justify-center text-amber-600">
-                      <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                      </svg>
-                    </div>
-                  )}
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
 
       {(data.cumpleanosHoy?.length ?? 0) > 0 && (
         <div className="rounded-2xl border border-amber-100 bg-amber-50/60 p-6 shadow-sm animate-scale-in">

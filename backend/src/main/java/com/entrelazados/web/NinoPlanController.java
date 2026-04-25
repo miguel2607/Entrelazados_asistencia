@@ -14,6 +14,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDate;
+import java.time.format.DateTimeParseException;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -112,6 +113,21 @@ public class NinoPlanController {
     public Map<String, Object> quitarSesiones(@PathVariable Integer id, @RequestParam Integer cantidad) {
         NinoPlan p = planService.quitarSesiones(id, cantidad);
         return toResponse(p);
+    }
+
+    @PatchMapping("/{id}/fecha-asignacion")
+    public Map<String, Object> actualizarFechaAsignacion(@PathVariable Integer id, @RequestBody Map<String, String> body) {
+        String fechaRaw = body != null ? body.get("fechaInicio") : null;
+        if (fechaRaw == null || fechaRaw.isBlank()) {
+            throw new ConflictoException("Debes enviar la fecha de asignación");
+        }
+        try {
+            LocalDate fecha = LocalDate.parse(fechaRaw);
+            NinoPlan p = planService.actualizarFechaInicio(id, fecha);
+            return toResponse(p);
+        } catch (DateTimeParseException ex) {
+            throw new ConflictoException("Formato de fecha inválido. Usa YYYY-MM-DD");
+        }
     }
 
     @PostMapping("/{id}/congelar")

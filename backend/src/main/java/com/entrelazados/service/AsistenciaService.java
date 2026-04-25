@@ -41,13 +41,27 @@ public class AsistenciaService {
             throw new ConflictoException("Debe seleccionar un estudiante, un plan asignado y un servicio para registrar la entrada.");
         }
 
+        NinoPlanEntity plan = null;
+        if (idPlan != null) {
+            plan = planRepo.findById(idPlan)
+                    .orElseThrow(() -> new RecursoNoEncontradoException("Plan no encontrado"));
+            if (!idNino.equals(plan.getIdNino())) {
+                throw new ConflictoException("El plan seleccionado no pertenece al niño.");
+            }
+
+            // La vigencia del plan se exige SIEMPRE para cualquier entrada manual.
+            if (plan.getFechaInicio() != null && fecha.isBefore(plan.getFechaInicio())) {
+                throw new ConflictoException("El plan seleccionado aún no está vigente para esta fecha.");
+            }
+            if (plan.getFechaFin() != null && fecha.isAfter(plan.getFechaFin())) {
+                throw new ConflictoException("El plan seleccionado está vencido para esta fecha.");
+            }
+        }
+
         // Regla: Solo descontar 1 sesión por día para el niño (sin importar jornada)
         boolean yaAsistioHoy = repo.existsByIdNinoAndFecha(idNino, fecha);
 
-        if (idPlan != null && !yaAsistioHoy) {
-            NinoPlanEntity plan = planRepo.findById(idPlan)
-                    .orElseThrow(() -> new RecursoNoEncontradoException("Plan no encontrado"));
-
+        if (plan != null && !yaAsistioHoy) {
             if (plan.getSesionesConsumidas() >= plan.getTotalSesiones()) {
                 throw new ConflictoException("El plan ya no tiene sesiones disponibles");
             }

@@ -13,6 +13,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
+import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -214,6 +215,33 @@ public class NinoPlanService {
         if (e.getFechaInicio() != null) {
             e.setFechaFin(e.getFechaInicio().plusDays(nuevoTotal - 1));
         }
+        return toDomain(repo.save(e));
+    }
+
+    @Transactional
+    public NinoPlan actualizarFechaInicio(Integer id, LocalDate nuevaFechaInicio) {
+        if (nuevaFechaInicio == null) {
+            throw new com.entrelazados.web.ConflictoException("La fecha de asignación es obligatoria");
+        }
+
+        NinoPlanEntity e = repo.findById(id)
+                .orElseThrow(() -> new RecursoNoEncontradoException("Plan no encontrado"));
+
+        LocalDate fechaInicioAnterior = e.getFechaInicio();
+        LocalDate fechaFinAnterior = e.getFechaFin();
+
+        e.setFechaInicio(nuevaFechaInicio);
+
+        if (fechaFinAnterior != null) {
+            long spanDias = 0;
+            if (fechaInicioAnterior != null) {
+                spanDias = Math.max(0, ChronoUnit.DAYS.between(fechaInicioAnterior, fechaFinAnterior));
+            } else if (e.getTotalSesiones() != null && e.getTotalSesiones() > 0) {
+                spanDias = e.getTotalSesiones() - 1L;
+            }
+            e.setFechaFin(nuevaFechaInicio.plusDays(spanDias));
+        }
+
         return toDomain(repo.save(e));
     }
 

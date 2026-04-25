@@ -92,6 +92,10 @@ export function NinoDetallePage() {
   const [freezePlanId, setFreezePlanId] = useState<number | null>(null);
   const [freezeDias, setFreezeDias] = useState<number>(7);
   const [freezeMotivo, setFreezeMotivo] = useState('');
+  const [editFechaModalOpen, setEditFechaModalOpen] = useState(false);
+  const [editFechaPlanId, setEditFechaPlanId] = useState<number | null>(null);
+  const [editFechaValue, setEditFechaValue] = useState('');
+  const [savingFechaAsignacion, setSavingFechaAsignacion] = useState(false);
 
   const load = () => {
     if (!id) return;
@@ -290,6 +294,27 @@ export function NinoDetallePage() {
   const abrirAgregarAcudiente = () => {
     setParentForm({ nombre: '', telefono: '', cc: '', parentesco: 'madre' });
     setParentModalOpen(true);
+  };
+
+  const abrirEditarFechaAsignacion = (idPlan: number, fechaInicio: string) => {
+    setEditFechaPlanId(idPlan);
+    setEditFechaValue(fechaInicio);
+    setEditFechaModalOpen(true);
+  };
+
+  const confirmarCambioFechaAsignacion = async () => {
+    if (!editFechaPlanId || !editFechaValue) return;
+    setSavingFechaAsignacion(true);
+    try {
+      await api.patch(`/planes/${editFechaPlanId}/fecha-asignacion`, { fechaInicio: editFechaValue });
+      setEditFechaModalOpen(false);
+      setEditFechaPlanId(null);
+      load();
+    } catch (err: any) {
+      alert('Error al actualizar la fecha de asignación: ' + (err?.message ?? String(err)));
+    } finally {
+      setSavingFechaAsignacion(false);
+    }
   };
 
   const guardarAcudienteYAsociar = async (e: React.FormEvent) => {
@@ -506,6 +531,15 @@ export function NinoDetallePage() {
                         <p className="mt-1 text-[10px] font-bold text-[#4b5563] uppercase tracking-widest">
                           Asignado: {new Date(e.fechaInicio + 'T00:00:00').toLocaleDateString('es-CO')}
                         </p>
+                        {e.tipo.toLowerCase() === 'paquete' && (
+                          <button
+                            type="button"
+                            onClick={() => abrirEditarFechaAsignacion(e.id, e.fechaInicio)}
+                            className="mt-2 inline-flex items-center gap-1 rounded-md border border-indigo-100 bg-indigo-50 px-2 py-1 text-[10px] font-extrabold uppercase tracking-widest text-[#2d1b69] hover:border-indigo-300 hover:bg-indigo-100"
+                          >
+                            Editar fecha
+                          </button>
+                        )}
                         {e.finalizado && e.fechaTermino && (
                           <p className="mt-1 text-xs font-bold text-rose-700">
                             Terminó el {new Date(e.fechaTermino + 'T00:00:00').toLocaleDateString('es-CO', { day: 'numeric', month: 'long' })}
@@ -532,7 +566,7 @@ export function NinoDetallePage() {
                       <button
                         onClick={() => abrirCongelarModal(e.id, 7)}
                         disabled={isFreezing !== null}
-                        className="flex items-center justify-center gap-2 py-2.5 rounded-xl border border-[#e2e8f0] bg-white text-[9px] font-extrabold text-[#k026d3] uppercase tracking-widest hover:bg-fuchsia-50 hover:border-[#c026d3] transition-all disabled:opacity-50"
+                        className="flex items-center justify-center gap-2 py-2.5 rounded-xl border border-[#e2e8f0] bg-white text-[9px] font-extrabold text-[#c026d3] uppercase tracking-widest hover:bg-fuchsia-50 hover:border-[#c026d3] transition-all disabled:opacity-50"
                       >
                         <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M13 10V3L4 14h7v7l9-11h-7z" />
@@ -542,7 +576,7 @@ export function NinoDetallePage() {
                       <button
                         onClick={() => abrirCongelarModal(e.id, 14)}
                         disabled={isFreezing !== null}
-                        className="flex items-center justify-center gap-2 py-2.5 rounded-xl border border-[#e2e8f0] bg-white text-[9px] font-extrabold text-[#k026d3] uppercase tracking-widest hover:bg-fuchsia-50 hover:border-[#c026d3] transition-all disabled:opacity-50"
+                        className="flex items-center justify-center gap-2 py-2.5 rounded-xl border border-[#e2e8f0] bg-white text-[9px] font-extrabold text-[#c026d3] uppercase tracking-widest hover:bg-fuchsia-50 hover:border-[#c026d3] transition-all disabled:opacity-50"
                       >
                         <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M13 10V3L4 14h7v7l9-11h-7z" />
@@ -698,6 +732,47 @@ export function NinoDetallePage() {
               className="google-button-primary disabled:opacity-50"
             >
               {isFreezing !== null ? 'Congelando...' : 'Confirmar congelación'}
+            </button>
+          </div>
+        </div>
+      </Modal>
+
+      <Modal
+        open={editFechaModalOpen}
+        onClose={() => setEditFechaModalOpen(false)}
+        title="Editar Fecha de Asignación"
+      >
+        <div className="space-y-5">
+          <p className="text-sm text-[#4b5563]">
+            Cambia la fecha de asignación del paquete para corregir el inicio real.
+          </p>
+          <div className="space-y-2">
+            <label htmlFor="fecha-asignacion-plan" className="block text-[11px] font-extrabold text-[#4b5563] uppercase tracking-widest">
+              Fecha de asignación
+            </label>
+            <input
+              id="fecha-asignacion-plan"
+              type="date"
+              value={editFechaValue}
+              onChange={(e) => setEditFechaValue(e.target.value)}
+              className="w-full rounded-xl border border-[#e2e8f0] px-4 py-3 text-sm font-medium focus:border-[#2d1b69] focus:outline-none focus:ring-4 focus:ring-indigo-50 transition-all shadow-sm"
+            />
+          </div>
+          <div className="flex justify-end gap-3 pt-4 border-t border-[#e2e8f0]">
+            <button
+              type="button"
+              onClick={() => setEditFechaModalOpen(false)}
+              className="google-button-secondary"
+            >
+              Cancelar
+            </button>
+            <button
+              type="button"
+              onClick={confirmarCambioFechaAsignacion}
+              disabled={savingFechaAsignacion || !editFechaValue}
+              className="google-button-primary disabled:opacity-50"
+            >
+              {savingFechaAsignacion ? 'Guardando...' : 'Guardar fecha'}
             </button>
           </div>
         </div>
