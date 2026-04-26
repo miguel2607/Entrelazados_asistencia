@@ -4,6 +4,7 @@ import { fechaLocalYYYYMMDD } from '../../shared/fechaLocal';
 import { Modal } from '../../shared/components/Modal';
 import { AsistenciaReportesSection } from './AsistenciaReportesSection';
 import { actualizarGrupo, crearGrupo, crearSubgrupo, eliminarGrupo, listarGrupos, listarSubgrupos, type GrupoOption, type SubgrupoOption } from '../../shared/grupos';
+import { useNavigate } from 'react-router-dom';
 
 type AlertaPlan = {
   idPlan: number;
@@ -39,17 +40,33 @@ type DashboardResponse = {
   cumpleanosHoy: { id: number; nombre: string; fechaNacimiento: string; edadCumplida: number; mensaje: string }[];
 };
 
+type AlertaImportanteMini = {
+  id: number;
+  tipo: 'SIN_PLAN_ACTIVO' | 'SIN_SESIONES_DISPONIBLES';
+  mensaje: string;
+  estado: 'NUEVA' | 'VISTA' | 'RESUELTA';
+  creadaEn: string;
+};
+
 type NinoResumen = { id: number; nombre: string; biometricId?: string };
 type Step1Form = { nombre: string; ti: string; fechaNacimiento: string; biometricId: string; grupo: string; subgrupo: string };
 type Step2Form = { nombre: string; cc: string; telefono: string; parentesco: string };
 
 /** Intervalo de actualización del dashboard para disminuir carga en Render. */
 const LIVE_POLL_INTERVAL = 10000;
+const ALERTAS_POLL_INTERVAL = 12000;
 
 export function DashboardPage() {
+  const navigate = useNavigate();
   const [data, setData] = useState<DashboardResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [alertasNuevas, setAlertasNuevas] = useState(0);
+  const [destelloCampana, setDestelloCampana] = useState(false);
+  const [alertasMenuOpen, setAlertasMenuOpen] = useState(false);
+  const [ultimasAlertas, setUltimasAlertas] = useState<AlertaImportanteMini[]>([]);
+  const ultimaAlertaIdRef = useRef<number | null>(null);
+  const campanaMenuRef = useRef<HTMLDivElement | null>(null);
 
   // Live update state for "En Sala Ahora"
   const [liveAsistencia, setLiveAsistencia] = useState<DashboardResponse['asistenciaHoy']>([]);
@@ -362,6 +379,52 @@ export function DashboardPage() {
     return () => clearInterval(clockRef);
   }, []);
 
+  useEffect(() => {
+    let mounted = true;
+    const loadResumenAlertas = () => {
+      api
+        .get<{ nuevas: number; ultimaNueva: { id: number } | null }>('/alertas-importantes/resumen')
+        .then((resumen) => {
+          if (!mounted) return;
+          setAlertasNuevas(resumen.nuevas);
+          if (resumen.ultimaNueva && resumen.ultimaNueva.id !== ultimaAlertaIdRef.current) {
+            ultimaAlertaIdRef.current = resumen.ultimaNueva.id;
+            setDestelloCampana(true);
+            globalThis.setTimeout(() => setDestelloCampana(false), 1800);
+          }
+        })
+        .catch(() => undefined);
+
+      api
+        .get<AlertaImportanteMini[]>('/alertas-importantes')
+        .then((rows) => {
+          if (!mounted) return;
+          setUltimasAlertas(rows.slice(0, 3));
+        })
+        .catch(() => undefined);
+    };
+
+    loadResumenAlertas();
+    const poll = globalThis.setInterval(loadResumenAlertas, ALERTAS_POLL_INTERVAL);
+    return () => {
+      mounted = false;
+      globalThis.clearInterval(poll);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!alertasMenuOpen) return;
+    const onDocClick = (event: MouseEvent) => {
+      if (!campanaMenuRef.current) return;
+      const target = event.target as Node;
+      if (!campanaMenuRef.current.contains(target)) {
+        setAlertasMenuOpen(false);
+      }
+    };
+    globalThis.addEventListener('mousedown', onDocClick);
+    return () => globalThis.removeEventListener('mousedown', onDocClick);
+  }, [alertasMenuOpen]);
+
   const formatTiempoEnSala = useCallback((horaEntrada?: string | null) => {
     if (!horaEntrada) return 'Tiempo no disponible';
     const [h, m, s] = horaEntrada.split(':').map((part) => Number.parseInt(part, 10));
@@ -449,7 +512,7 @@ export function DashboardPage() {
 
   return (
     <div className="mx-auto w-full max-w-[min(100%,92rem)] space-y-10 px-1 sm:px-0">
-      <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-end animate-fade-in">
+      <div className="relative z-30 flex flex-col justify-between gap-4 sm:flex-row sm:items-end animate-fade-in">
         <div>
           <h2 className="text-3xl font-extrabold text-[#111827] tracking-tight">
             Panel de Gestión
@@ -459,6 +522,65 @@ export function DashboardPage() {
           </p>
         </div>
         <div className="flex items-center gap-3">
+          <div className="relative z-50" ref={campanaMenuRef}>
+            <button
+              type="button"
+              onClick={() => setAlertasMenuOpen((prev) => !prev)}
+              className={`relative inline-flex items-center gap-2 rounded-xl border px-3 py-2 text-sm font-semibold shadow-sm transition ${
+                alertasNuevas > 0
+                  ? 'border-rose-200 bg-rose-50 text-rose-700 hover:bg-rose-100'
+                  : 'border-[#e2e8f0] bg-white text-[#4b5563] hover:bg-[#f8f9fa]'
+              }`}
+              title={alertasNuevas > 0 ? `${alertasNuevas} alertas nuevas` : 'Sin alertas nuevas'}
+            >
+              <svg className={`h-4 w-4 ${destelloCampana ? 'animate-bounce' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+              </svg>
+              Alertas
+              <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+              </svg>
+              {alertasNuevas > 0 && (
+                <span className="absolute -right-2 -top-2 inline-flex min-w-5 items-center justify-center rounded-full bg-[#d93025] px-1.5 py-0.5 text-[10px] font-bold text-white">
+                  {alertasNuevas > 99 ? '99+' : alertasNuevas}
+                </span>
+              )}
+            </button>
+            {alertasMenuOpen && (
+              <div className="absolute right-0 z-[80] mt-2 w-[22rem] rounded-xl border border-[#e2e8f0] bg-white p-3 shadow-xl">
+                <div className="mb-2 flex items-center justify-between">
+                  <p className="text-xs font-extrabold uppercase tracking-widest text-[#4b5563]">Notificaciones</p>
+                  <span className="rounded-full bg-rose-100 px-2 py-0.5 text-[10px] font-bold text-rose-700">
+                    {alertasNuevas} nuevas
+                  </span>
+                </div>
+                <div className="space-y-2">
+                  {ultimasAlertas.length === 0 ? (
+                    <p className="rounded-lg bg-[#f8f9fa] px-3 py-4 text-center text-xs text-[#6b7280]">
+                      No hay notificaciones recientes.
+                    </p>
+                  ) : (
+                    ultimasAlertas.map((alerta) => (
+                      <div key={alerta.id} className="rounded-lg border border-[#edf0f3] px-3 py-2">
+                        <p className="text-xs font-semibold text-[#1f2937]">{alerta.mensaje}</p>
+                        <p className="mt-1 text-[10px] text-[#6b7280]">{new Date(alerta.creadaEn).toLocaleString('es-CO')}</p>
+                      </div>
+                    ))
+                  )}
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setAlertasMenuOpen(false);
+                    navigate('/alertas');
+                  }}
+                  className="mt-3 w-full rounded-lg bg-[#2d1b69] px-3 py-2 text-xs font-bold uppercase tracking-wider text-white hover:bg-[#4c1d95]"
+                >
+                  Ir al panel de notificaciones
+                </button>
+              </div>
+            )}
+          </div>
           <button
             type="button"
             onClick={openWizard}

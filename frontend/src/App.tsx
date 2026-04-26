@@ -26,6 +26,9 @@ const AsistenciaPadresPage = lazy(() =>
 const PlanesPadresPage = lazy(() =>
   import('./features/padres/PlanesPadresPage').then((m) => ({ default: m.PlanesPadresPage }))
 );
+const AlertasImportantesPage = lazy(() =>
+  import('./features/alertas/AlertasImportantesPage').then((m) => ({ default: m.AlertasImportantesPage }))
+);
 
 function PadresFallback() {
   return (
@@ -61,6 +64,14 @@ function App() {
             <Route path="servicios" element={<ServiciosPage />} />
             <Route path="paquetes" element={<PaquetesPage />} />
             <Route path="planes" element={<PlanesPage />} />
+            <Route
+              path="alertas"
+              element={
+                <Suspense fallback={<PadresFallback />}>
+                  <AlertasImportantesPage />
+                </Suspense>
+              }
+            />
             <Route
               path="padres"
               element={

@@ -22,11 +22,14 @@ public class AsistenciaService {
     private final AsistenciaJpaRepository repo;
     private final NinoService ninoService;
     private final NinoPlanJpaRepository planRepo;
+    private final AlertaImportanteService alertaImportanteService;
 
-    public AsistenciaService(AsistenciaJpaRepository repo, NinoService ninoService, NinoPlanJpaRepository planRepo) {
+    public AsistenciaService(AsistenciaJpaRepository repo, NinoService ninoService, NinoPlanJpaRepository planRepo,
+            AlertaImportanteService alertaImportanteService) {
         this.repo = repo;
         this.ninoService = ninoService;
         this.planRepo = planRepo;
+        this.alertaImportanteService = alertaImportanteService;
     }
 
     @Transactional
@@ -146,13 +149,27 @@ public class AsistenciaService {
             return registrarSalida(idNino, entradaActiva.get().getIdPlan(), hoy, ahora, "Marcación automática vía Biométrico (Salida)");
         } else {
             // No ha entrado hoy, registrar ENTRADA
-            // Buscar el primer plan activo que tenga sesiones disponibles
-            NinoPlanEntity plan = planRepo.findByIdNinoOrderByFechaInicio(idNino).stream()
-                    .filter(p -> p.getSesionesConsumidas() < p.getTotalSesiones())
+            List<NinoPlanEntity> planesVigentes = planRepo.findByIdNinoOrderByFechaInicio(idNino).stream()
                     .filter(p -> p.getFechaInicio() == null || !hoy.isBefore(p.getFechaInicio()))
                     .filter(p -> p.getFechaFin() == null || !hoy.isAfter(p.getFechaFin()))
+                    .toList();
+
+            if (planesVigentes.isEmpty()) {
+                String mensaje = "No se encontró un plan activo para el niño " + nino.getNombre();
+                alertaImportanteService.crear(idNino, nino.getNombre(), AlertaImportanteService.TIPO_SIN_PLAN_ACTIVO,
+                        mensaje);
+                throw new com.entrelazados.web.ConflictoException(mensaje);
+            }
+
+            NinoPlanEntity plan = planesVigentes.stream()
+                    .filter(p -> p.getSesionesConsumidas() < p.getTotalSesiones())
                     .findFirst()
-                    .orElseThrow(() -> new com.entrelazados.web.ConflictoException("No se encontró un plan activo con sesiones disponibles para el niño " + nino.getNombre()));
+                    .orElseThrow(() -> {
+                        String mensaje = "No hay sesiones disponibles para el niño " + nino.getNombre();
+                        alertaImportanteService.crear(idNino, nino.getNombre(),
+                                AlertaImportanteService.TIPO_SIN_SESIONES_DISPONIBLES, mensaje);
+                        return new com.entrelazados.web.ConflictoException(mensaje);
+                    });
 
             // Determinar jornada basado en la hora (Antés de mediodía es Mañana)
             String jornada = ahora.isBefore(LocalTime.of(12, 0)) ? "Mañana" : "Tarde";

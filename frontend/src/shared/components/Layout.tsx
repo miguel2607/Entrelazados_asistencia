@@ -1,6 +1,8 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { api } from '../api/apiClient';
+import { Toast } from './Toast';
 
 const navItems = [
   { to: '/', label: 'Dashboard', icon: (active: boolean) => (
@@ -38,6 +40,11 @@ const navItems = [
       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
     </svg>
   ) },
+  { to: '/alertas', label: 'Alertas', icon: (active: boolean) => (
+    <svg className={`h-5 w-5 ${active ? 'text-[#2d1b69]' : 'text-[#4b5563]'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+    </svg>
+  ) },
   { to: '/padres', label: 'Panel padres', end: true, icon: (active: boolean) => (
     <svg className={`h-5 w-5 ${active ? 'text-[#2d1b69]' : 'text-[#4b5563]'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
@@ -64,6 +71,35 @@ export function Layout() {
   const { username, logout } = useAuth();
   const navigate = useNavigate();
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [alertasNuevas, setAlertasNuevas] = useState(0);
+  const [toastMsg, setToastMsg] = useState<string | null>(null);
+  const [ultimaAlertaMostradaId, setUltimaAlertaMostradaId] = useState<number | null>(null);
+
+  useEffect(() => {
+    let mounted = true;
+
+    const loadResumen = () => {
+      api.get<{ nuevas: number; ultimaNueva: { id: number; mensaje: string } | null }>('/alertas-importantes/resumen')
+        .then((res) => {
+          if (!mounted) return;
+          setAlertasNuevas(res.nuevas);
+          if (res.ultimaNueva && res.ultimaNueva.id !== ultimaAlertaMostradaId) {
+            setToastMsg(res.ultimaNueva.mensaje);
+            setUltimaAlertaMostradaId(res.ultimaNueva.id);
+          }
+        })
+        .catch(() => {
+          // Ignorar fallos temporales en el polling de alertas.
+        });
+    };
+
+    loadResumen();
+    const interval = globalThis.setInterval(loadResumen, 12000);
+    return () => {
+      mounted = false;
+      globalThis.clearInterval(interval);
+    };
+  }, [ultimaAlertaMostradaId]);
 
   function handleLogout() {
     logout();
@@ -73,7 +109,7 @@ export function Layout() {
   return (
     <div className="flex h-screen overflow-hidden bg-[#f8f7ff]">
       {/* Sidebar */}
-      <aside className={`${sidebarCollapsed ? 'w-20' : 'w-64'} border-r border-[#e2e8f0] bg-white pt-6 transition-all duration-300`}>
+      <aside className={`${sidebarCollapsed ? 'w-20' : 'w-64'} flex h-screen flex-col border-r border-[#e2e8f0] bg-white pt-6 transition-all duration-300`}>
         <div className={`mb-10 flex items-center ${sidebarCollapsed ? 'justify-center px-2' : 'gap-3 px-6'} animate-fade-in`}>
           <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-[#2d1b69] to-[#4c1d95] text-white shadow-lg shadow-indigo-200">
             <span className="text-xl font-bold">P</span>
@@ -102,7 +138,7 @@ export function Layout() {
           </button>
         </div>
         
-        <nav className={`space-y-1.5 ${sidebarCollapsed ? 'px-2' : 'px-3'}`}>
+        <nav className={`flex-1 space-y-1.5 overflow-y-auto pb-6 ${sidebarCollapsed ? 'px-2' : 'px-3'}`}>
           {navItems.map((item, idx) => (
             <NavLink
               key={item.to}
@@ -122,6 +158,11 @@ export function Layout() {
                 <>
                   {item.icon(isActive)}
                   {!sidebarCollapsed && item.label}
+                  {!sidebarCollapsed && item.to === '/alertas' && alertasNuevas > 0 && (
+                    <span className="ml-auto inline-flex min-w-5 items-center justify-center rounded-full bg-[#d93025] px-1.5 py-0.5 text-[10px] font-bold text-white">
+                      {alertasNuevas > 99 ? '99+' : alertasNuevas}
+                    </span>
+                  )}
                 </>
               )}
             </NavLink>
@@ -166,6 +207,7 @@ export function Layout() {
           </div>
         </main>
       </div>
+      {toastMsg && <Toast message={toastMsg} type="error" onClose={() => setToastMsg(null)} duration={6500} />}
     </div>
   );
 }
