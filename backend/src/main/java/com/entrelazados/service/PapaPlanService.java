@@ -171,7 +171,7 @@ public class PapaPlanService {
         PapaPlanEntity e = repo.findById(id).orElseThrow(() -> new RecursoNoEncontradoException("Plan no encontrado"));
         int nuevoTotal = e.getTotalSesiones() + cantidad;
         e.setTotalSesiones(nuevoTotal);
-        if (e.getFechaInicio() != null) {
+        if (e.getTipo() != TipoPlan.PAQUETE && e.getFechaInicio() != null) {
             e.setFechaFin(e.getFechaInicio().plusDays(nuevoTotal - 1));
         }
         return toDomain(repo.save(e));
@@ -193,7 +193,7 @@ public class PapaPlanService {
             return toDomain(e);
         }
         e.setTotalSesiones(nuevoTotal);
-        if (e.getFechaInicio() != null) {
+        if (e.getTipo() != TipoPlan.PAQUETE && e.getFechaInicio() != null) {
             e.setFechaFin(e.getFechaInicio().plusDays(nuevoTotal - 1));
         }
         return toDomain(repo.save(e));
